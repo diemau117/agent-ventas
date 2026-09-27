@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ app/
 COPY frontend/ frontend/
 COPY alembic.ini .
-COPY migrations/ migrations/
+COPY alembic/ alembic/
 
 # Variables de entorno
 ENV PYTHONUNBUFFERED=1
