@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Ventas — Agente de ventas IA para tu negocio</title>
+  <meta name="description" content="Agente de ventas IA que responde, califica leads y agenda citas las 24 horas. Instalación en 5 minutos.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232652b4'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='Georgia,serif'%3EA%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="/">Agent Ventas</a>
+      <nav class="nav" aria-label="Secciones">
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#planes">Planes</a>
+        <a href="#contacto">Contacto</a>
+      </nav>
+      <a class="btn btn-primary" href="#empezar">Empezar ahora</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <h1>Agente de ventas IA que trabaja las 24 horas</h1>
+        <p class="hero-lead">Responde consultas, califica leads y agenda citas automáticamente. Tu negocio nunca más pierde una venta por no responder a tiempo.</p>
+        <div class="hero-acciones">
+          <a class="btn btn-primary" href="#empezar">Empezar prueba gratis</a>
+          <a class="btn btn-ghost" href="#como-funciona">Ver cómo funciona</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="seccion" id="como-funciona">
+      <div class="wrap">
+        <h2>Cómo funciona</h2>
+        <p class="section-lead">Tres pasos y tu agente está operativo.</p>
+        <div class="grid-3">
+          <article class="card">
+            <h3>1. Registrá tu negocio</h3>
+            <p>Completá un formulario simple con los datos de tu empresa. Sin tarjeta de crédito.</p>
+          </article>
+          <article class="card">
+            <h3>2. Subí tu catálogo</h3>
+            <p>Subí un PDF o pegá texto con tus productos, precios y horarios. El agente aprende en segundos.</p>
+          </article>
+          <article class="card">
+            <h3>3. Pegá el widget</h3>
+            <p>Copiá un código de 2 líneas en tu sitio web. Tu agente ya está respondiendo.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="seccion seccion-superficie" id="beneficios">
+      <div class="wrap">
+        <h2>Qué gana tu negocio</h2>
+        <div class="grid-3">
+          <article class="card">
+            <h3>Respuesta inmediata</h3>
+            <p>Cada consulta recibe respuesta al instante, incluso de madrugada y los fines de semana.</p>
+          </article>
+          <article class="card">
+            <h3>Leads calificados</h3>
+            <p>Guarda nombre, necesidad, presupuesto y urgencia en el CRM automáticamente.</p>
+          </article>
+          <article class="card">
+            <h3>Agenda automática</h3>
+            <p>El agente propone turnos y deriva a un humano cuando es necesario.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="seccion" id="planes">
+      <div class="wrap">
+        <h2>Planes y precios</h2>
+        <p class="section-lead">Elegí el plan que mejor se adapte a tu negocio.</p>
+        <div class="planes-grid">
+          <article class="price-card">
+            <h3>Starter</h3>
+            <p class="precio">$29 USD<span class="precio-unidad">/mes</span></p>
+            <p class="precio-nota">Para negocios que empiezan</p>
+            <ul class="lista">
+              <li>1 agente de ventas</li>
+              <li>Widget para tu sitio web</li>
+              <li>CRM de leads y citas</li>
+              <li>Respuestas por chat web</li>
+              <li>Soporte por email</li>
+            </ul>
+            <button class="btn btn-primary" data-plan="starter">Elegir Starter</button>
+          </article>
+          <article class="price-card price-card-destacada">
+            <h3>Pro</h3>
+            <p class="precio">$79 USD<span class="precio-unidad">/mes</span></p>
+            <p class="precio-nota">Para negocios en crecimiento</p>
+            <ul class="lista">
+              <li>Todo lo de Starter</li>
+              <li>WhatsApp Business API</li>
+              <li>Agenda de turnos automática</li>
+              <li>Base de conocimiento ilimitada</li>
+              <li>Soporte prioritario</li>
+            </ul>
+            <button class="btn btn-primary" data-plan="pro">Elegir Pro</button>
+          </article>
+          <article class="price-card">
+            <h3>Enterprise</h3>
+            <p class="precio">$199 USD<span class="precio-unidad">/mes</span></p>
+            <p class="precio-nota">Para empresas con alto volumen</p>
+            <ul class="lista">
+              <li>Todo lo de Pro</li>
+              <li>Múltiples agentes</li>
+              <li>Integración con tu CRM</li>
+              <li>API personalizada</li>
+              <li>Soporte dedicado 24/7</li>
+            </ul>
+            <button class="btn btn-primary" data-plan="enterprise">Elegir Enterprise</button>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="seccion seccion-superficie" id="empezar">
+      <div class="wrap wrap-estrecho">
+        <h2>Empezá ahora</h2>
+        <p class="section-lead">Completá el formulario y accedé al panel de control.</p>
+        <form id="form-registro" class="form-lead">
+          <div class="form-grid">
+            <div class="field">
+              <label for="f-nombre">Nombre *</label>
+              <input id="f-nombre" name="name" type="text" required autocomplete="name" maxlength="200">
+            </div>
+            <div class="field">
+              <label for="f-email">Email *</label>
+              <input id="f-email" name="email" type="email" required autocomplete="email" maxlength="200">
+            </div>
+            <div class="field">
+              <label for="f-empresa">Nombre del negocio *</label>
+              <input id="f-empresa" name="business_name" type="text" required maxlength="200">
+            </div>
+            <div class="field">
+              <label for="f-telefono">Teléfono / WhatsApp</label>
+              <input id="f-telefono" name="phone" type="tel" autocomplete="tel" maxlength="100">
+            </div>
+            <div class="field field-ancho">
+              <label for="f-mensaje">¿Qué vendés? *</label>
+              <textarea id="f-mensaje" name="description" rows="3" required maxlength="1000" placeholder="Ej: Servicios dentales, venta de ropa, asesoría legal..."></textarea>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="form-enviar" type="submit">Crear mi cuenta</button>
+          <p class="form-estado" id="form-estado" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="seccion" id="contacto">
+      <div class="wrap wrap-estrecho">
+        <h2>¿Tenés dudas?</h2>
+        <p class="section-lead">Escribinos y te respondemos en menos de 24 horas.</p>
+        <form id="form-contacto" class="form-lead">
+          <div class="form-grid">
+            <div class="field">
+              <label for="c-nombre">Nombre</label>
+              <input id="c-nombre" name="name" type="text" autocomplete="name" maxlength="200">
+            </div>
+            <div class="field">
+              <label for="c-email">Email</label>
+              <input id="c-email" name="email" type="email" autocomplete="email" maxlength="200">
+            </div>
+            <div class="field field-ancho">
+              <label for="c-mensaje">Mensaje</label>
+              <textarea id="c-mensaje" name="message" rows="4" maxlength="2000"></textarea>
+            </div>
+          </div>
+          <button class="btn btn-primary" type="submit">Enviar mensaje</button>
+          <p class="form-estado" id="contacto-estado" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div>
+        <p class="footer-brand">Agent Ventas</p>
+        <p>Agente de ventas IA para negocios que no pueden dejar una consulta sin responder.</p>
+      </div>
+      <div>
+        <h2 class="footer-titulo">Contacto</h2>
+        <p>Email: hola@agentventas.com</p>
+      </div>
+    </div>
+    <div class="wrap footer-base">
+      <p>© 2026 Agent Ventas.</p>
+    </div>
+  </footer>
+
+  <script>
+    // Manejo de planes
+    document.querySelectorAll('[data-plan]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plan = btn.dataset.plan;
+        // Redirigir a Stripe Checkout (implementar)
+        alert('Redirigiendo a pago seguro de Stripe...\nPlan: ' + plan);
+        // window.location.href = '/api/stripe/checkout?plan=' + plan;
+      });
+    });
+
+    // Formulario de registro
+    document.getElementById('form-registro').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const estado = document.getElementById('form-estado');
+      estado.textContent = 'Creando tu cuenta...';
+
+      const data = {
+        name: document.getElementById('f-nombre').value,
+        email: document.getElementById('f-email').value,
+        business_name: document.getElementById('f-empresa').value,
+        phone: document.getElementById('f-telefono').value,
+        description: document.getElementById('f-mensaje').value,
+      };
+
+      try {
+        const res = await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        if (res.ok) {
+          estado.textContent = '¡Cuenta creada! Revisá tu email.';
+          estado.style.color = 'green';
+        } else {
+          estado.textContent = result.detail || 'Error al crear la cuenta';
+          estado.style.color = 'red';
+        }
+      } catch (err) {
+        estado.textContent = 'Error de conexión';
+        estado.style.color = 'red';
+      }
+    });
+
+    // Formulario de contacto
+    document.getElementById('form-contacto').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const estado = document.getElementById('contacto-estado');
+      estado.textContent = 'Enviando...';
+
+      const data = {
+        name: document.getElementById('c-nombre').value,
+        email: document.getElementById('c-email').value,
+        message: document.getElementById('c-mensaje').value,
+      };
+
+      try {
+        const res = await fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          estado.textContent = '¡Mensaje enviado! Te respondemos pronto.';
+          estado.style.color = 'green';
+        } else {
+          estado.textContent = 'Error al enviar';
+          estado.style.color = 'red';
+        }
+      } catch (err) {
+        estado.textContent = 'Error de conexión';
+        estado.style.color = 'red';
+      }
+    });
+  </script>
+</body>
+</html>

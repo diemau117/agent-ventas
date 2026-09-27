@@ -1,0 +1,10 @@
+; Backup diario de la base de Agent Ventas.
+; Prefiere pg_dump contra DATABASE_URL; si no, sqlite3 .backup; si nada,
+; sale 0 con un mensaje. Nunca falla ruidosamente (ver deploy/backup.sh).
+
+[Unit]
+Description=Backup de Agent Ventas (Postgres o SQLite)
+
+[Service]
+Type=oneshot
+ExecStart=/home/diego/Factory/agent-ventas/deploy/backup.sh

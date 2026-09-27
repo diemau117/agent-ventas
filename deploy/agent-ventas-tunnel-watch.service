@@ -1,0 +1,11 @@
+; Propaga la URL nueva del quick tunnel al Worker de la landing
+; (solo hace deploy si la URL cambió respecto a deploy/.last_tunnel_url).
+; Se dispara por agent-ventas-tunnel-watch.timer; también sirve un
+; `systemctl --user start agent-ventas-tunnel-watch.service` manual.
+
+[Unit]
+Description=Propagar URL del quick tunnel al Worker (Agent Ventas)
+
+[Service]
+Type=oneshot
+ExecStart=/home/diego/Factory/agent-ventas/deploy/update-tunnel-url.sh

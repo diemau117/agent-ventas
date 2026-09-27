@@ -1,0 +1,24 @@
+# Secretos nunca dentro de la imagen.
+.env
+.env.*
+
+# Repositorio y tooling (pero NO alembic/ ni alembic.ini: hacen falta para migrar).
+.git
+.github
+.pytest_cache
+**/__pycache__
+*.pyc
+.venv
+venv
+Makefile
+docker-compose.yml
+Dockerfile
+.dockerignore
+README.md
+AUDITORIA.md
+requirements-dev.txt
+
+# Tests y frontend con dependencias de Node (si las hubiera).
+tests/
+frontend/node_modules
+frontend/dist

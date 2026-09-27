@@ -1,0 +1,15 @@
+; Chatwoot Postgres user-space en :5434 (datos en ~/.local/pgdata, NO en /tmp
+; → sobrevive reboots). Unidad de USUARIO, instalación via deploy/README.md.
+; NO confundir con el cluster del sistema en :5432 (postgresql.service, root).
+
+[Unit]
+Description=Chatwoot Postgres (user-space 127.0.0.1:5434)
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/postgres -D /home/diego/.local/pgdata -p 5434 -k /tmp -h 127.0.0.1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

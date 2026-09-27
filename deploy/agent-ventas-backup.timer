@@ -1,0 +1,13 @@
+; Backup diario (persistente: si la máquina estaba apagada a la hora
+; programada, se ejecuta al arrancar).
+
+[Unit]
+Description=Backup diario de Agent Ventas
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

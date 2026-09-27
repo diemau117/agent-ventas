@@ -1,0 +1,15 @@
+; Valkey 9 (protocolo redis) para Chatwoot en :6390. Foreground para que
+; systemd sea el que lo reinicie. --save '' : la cola de Sidekiq es
+; reconstructible, no hace falta persistencia en disco.
+
+[Unit]
+Description=Chatwoot Valkey (:6390)
+
+[Service]
+Type=simple
+ExecStart=/home/diego/.local/bin/valkey-server --port 6390 --dir /home/diego/.local --logfile /home/diego/.local/valkey-systemd.log --save ''
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

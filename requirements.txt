@@ -1,0 +1,15 @@
+# Runtime — versiones pineadas exactas del entorno dev (Python 3.14).
+# Sin ">=" a propósito: el build de Docker y el CI deben ser reproducibles.
+# Para actualizar un paquete: pip show <pkg> -> cambiar la versión -> correr la suite.
+fastapi==0.138.1
+uvicorn[standard]==0.52.1
+langgraph==1.2.11
+sqlalchemy==2.0.51
+psycopg[binary]==3.3.4
+pydantic==2.13.5
+pydantic-settings==2.15.0
+httpx==0.28.1
+alembic==1.19.1
+stripe==11.0.0
+twilio==9.0.0
+python-multipart==0.0.9

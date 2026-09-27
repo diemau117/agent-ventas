@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Ventas · Sistema de captación y pre-venta con IA</title>
+<meta name="description" content="Landing de alto impacto y agente comercial con IA que responde, califica y agenda con la información real de tu negocio.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232652b4'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='Georgia,serif'%3EA%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/styles.css">
+<script>
+  /* Clave pública del negocio al que pertenece esta landing.
+     En producción la inyecta el servidor; también acepta ?key=... en la URL. */
+  window.AGENT_VENTAS_KEY = "";
+</script>
+<script src="/static/app.js" defer></script>
+<script src="/static/widget.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="/">Agent Ventas</a>
+    <nav class="nav" aria-label="Secciones">
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#planes">Planes</a>
+      <a href="#contacto">Contacto</a>
+    </nav>
+    <a class="btn btn-primary" href="#probar">Probar el agente</a>
+  </div>
+</header>
+
+<main id="contenido">
+
+  <section class="hero">
+    <div class="wrap hero-inner">
+      <h1>Sistema de captación y pre-venta con IA</h1>
+      <p class="hero-lead">Las consultas que no se responden a tiempo se pierden.
+        Nuestro agente atiende, califica y agenda por vos las 24 horas, con la
+        información real de tu negocio.</p>
+      <div class="hero-acciones">
+        <a class="btn btn-primary" href="#probar">Probar el agente</a>
+        <a class="btn btn-ghost" href="#planes">Ver planes</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion seccion-superficie" id="problema" aria-labelledby="problema-titulo">
+    <div class="wrap">
+      <h2 id="problema-titulo">Las consultas se pierden justo cuando podrían convertirse en ventas</h2>
+      <div class="grid-3">
+        <article class="card">
+          <h3>Mensajes fuera de horario</h3>
+          <p>Escriben de noche, el fin de semana o cuando estás con un cliente.
+            Si la respuesta llega horas después, la compra ya no está.</p>
+        </article>
+        <article class="card">
+          <h3>Oportunidades sin seguimiento</h3>
+          <p>Preguntas repetidas, presupuestos a medias y contactos que quedan
+            perdidos en el chat sin saber quién contestó qué.</p>
+        </article>
+        <article class="card">
+          <h3>Información dispersa</h3>
+          <p>Precios, horarios y condiciones viven en tu cabeza o en mil
+            mensajes. Cada respuesta depende de quién esté disponible.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion" id="como-funciona" aria-labelledby="como-titulo">
+    <div class="wrap">
+      <h2 id="como-titulo">Cómo funciona</h2>
+      <p class="section-lead">Del mensaje del visitante a una conversación
+        ordenada, con pasos claros en el medio.</p>
+      <ol class="flujo">
+        <li class="flujo-paso">
+          <h3>Landing</h3>
+          <p>El visitante llega a tu landing y escribe qué necesita.</p>
+          <span class="flujo-flecha" aria-hidden="true">→</span>
+        </li>
+        <li class="flujo-paso">
+          <h3>Agente</h3>
+          <p>El agente recibe el mensaje y decide cómo responderlo.</p>
+          <span class="flujo-flecha" aria-hidden="true">→</span>
+        </li>
+        <li class="flujo-paso">
+          <h3>LangGraph</h3>
+          <p>Un grafo coordinado recupera, decide y verifica cada respuesta
+            antes de enviarla.</p>
+          <span class="flujo-flecha" aria-hidden="true">→</span>
+        </li>
+        <li class="flujo-paso">
+          <h3>RAG, decisión y CRM</h3>
+          <ul class="flujo-ramas">
+            <li><strong>RAG:</strong> busca la respuesta en tu base de
+              conocimiento y tu catálogo.</li>
+            <li><strong>Decisión:</strong> elige entre responder, agendar o
+              derivar.</li>
+            <li><strong>CRM:</strong> registra el lead, su estado y el próximo
+              paso.</li>
+          </ul>
+          <span class="flujo-flecha" aria-hidden="true">→</span>
+        </li>
+        <li class="flujo-paso">
+          <h3>Calendario o humano</h3>
+          <p>Propone un turno o pasa la conversación a una persona, con el
+            contexto completo.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="seccion seccion-superficie" id="beneficios" aria-labelledby="beneficios-titulo">
+    <div class="wrap">
+      <h2 id="beneficios-titulo">Qué gana tu negocio</h2>
+      <div class="grid-3">
+        <article class="card">
+          <h3>Respuesta inmediata, siempre</h3>
+          <p>Cada consulta recibe respuesta al instante, incluso de madrugada y
+            los fines de semana.</p>
+        </article>
+        <article class="card">
+          <h3>Información real, no inventada</h3>
+          <p>El agente responde con tu base de conocimiento y tu catálogo, y un
+            verificador evita precios o horarios que no existen.</p>
+        </article>
+        <article class="card">
+          <h3>Leads calificados</h3>
+          <p>Guarda nombre, necesidad, presupuesto y urgencia en el CRM:
+            llegás con la conversación ordenada.</p>
+        </article>
+        <article class="card">
+          <h3>Agenda o traspaso a una persona</h3>
+          <p>Cuando toca un humano, la conversación pasa al equipo con el
+            resumen de lo conversado.</p>
+        </article>
+        <article class="card">
+          <h3>Memoria de cliente</h3>
+          <p>Recuerda lo que se habló en cada visita: no vuelve a pedir los
+            mismos datos.</p>
+        </article>
+        <article class="card">
+          <h3>Todo quedó registrado</h3>
+          <p>Cada turno se guarda con su intención, decisión y consumo, para
+            saber qué está pasando en el canal.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion" id="trabajos" aria-labelledby="trabajos-titulo">
+    <div class="wrap">
+      <h2 id="trabajos-titulo">Ejemplos y trabajos</h2>
+      <p class="section-lead">Estamos preparando los primeros casos para
+        publicarlos acá. No mostramos números que no estén verificados.</p>
+      <div class="grid-3">
+        <article class="card card-slot">
+          <p class="slot-estado">Próximamente</p>
+          <h3>Landing y agente para un negocio local</h3>
+          <p>El problema, la implementación y el resultado medido, de punta a
+            punta.</p>
+          <p class="slot-metrica">Resultado: <span class="metrica-bloque"
+            aria-label="dato aún no publicado"></span> por publicar</p>
+        </article>
+        <article class="card card-slot">
+          <p class="slot-estado">Próximamente</p>
+          <h3>Pre-venta para un catálogo de servicios</h3>
+          <p>Cómo el agente califica intereses antes de que un vendedor entre en
+            escena.</p>
+          <p class="slot-metrica">Resultado: <span class="metrica-bloque"
+            aria-label="dato aún no publicado"></span> por publicar</p>
+        </article>
+        <article class="card card-slot">
+          <p class="slot-estado">Próximamente</p>
+          <h3>Agenda automática de turnos</h3>
+          <p>De la consulta al turno confirmado, con derivación a humano cuando
+            hay conflicto.</p>
+          <p class="slot-metrica">Resultado: <span class="metrica-bloque"
+            aria-label="dato aún no publicado"></span> por publicar</p>
+        </article>
+      </div>
+      <p class="nota">Si querés ver el sistema funcionando, probá el agente
+        acá abajo o solicitá una demo con tus propios datos.</p>
+    </div>
+  </section>
+
+  <section class="seccion seccion-superficie" id="probar" aria-labelledby="probar-titulo">
+    <div class="wrap">
+      <h2 id="probar-titulo">Probá el agente</h2>
+      <p class="section-lead">Escribile como le escribiría un cliente: precios,
+        horarios, disponibilidad o qué necesitás. Responde al instante.</p>
+      <div id="agent-ventas"></div>
+      <noscript>
+        <p class="nota">Activa JavaScript para probar el chat, o dejá tus
+          datos en el <a href="#contacto">formulario de contacto</a>.</p>
+      </noscript>
+    </div>
+  </section>
+
+  <section class="seccion" id="planes" aria-labelledby="planes-titulo">
+    <div class="wrap">
+      <h2 id="planes-titulo">Planes y precios</h2>
+      <p class="section-lead">Un paquete, un resultado: tu canal de captación
+        funcionando de punta a punta.</p>
+      <div class="planes-grid">
+        <article class="price-card price-card-destacada">
+          <h3>Sistema de captación y pre-venta con IA</h3>
+          <p class="precio">$150 USD</p>
+          <p class="precio-nota">Landing + agente, implementados y listos para
+            usar.</p>
+          <ul class="lista">
+            <li>Landing de alto impacto con tu información y tu marca.</li>
+            <li>Agente comercial entrenado con tu base de conocimiento y
+              catálogo.</li>
+            <li>Formulario de captación y leads organizados en el CRM.</li>
+            <li>Agenda de turnos o traspaso a una persona cuando hace falta.</li>
+            <li>Puesta en marcha y publicación incluidas.</li>
+          </ul>
+          <a class="btn btn-primary" href="#contacto">Solicitar el sistema</a>
+        </article>
+        <article class="price-card">
+          <h3>Operación mensual</h3>
+          <p class="precio">$30–40 USD<span class="precio-unidad">/mes</span></p>
+          <p class="precio-nota">Según el alcance acordado para tu negocio.</p>
+          <ul class="lista">
+            <li>Infraestructura y hosting.</li>
+            <li>Mantenimiento y actualizaciones.</li>
+            <li>Monitoreo del sistema.</li>
+            <li>Soporte y ajustes de contenido.</li>
+          </ul>
+          <p class="nota">La mensualidad cubre un uso normal del servicio. El
+            consumo excesivo de APIs de IA tiene límites definidos y, si
+            necesitás más volumen, se acuerda por separado.</p>
+        </article>
+      </div>
+
+      <div class="catalogo" id="catalogo" hidden>
+        <h3 id="catalogo-titulo">Planes</h3>
+        <ul class="catalogo-lista" id="catalogo-planes"></ul>
+        <div id="catalogo-servicios-bloque" hidden>
+          <h3>Servicios</h3>
+          <ul class="catalogo-lista" id="catalogo-servicios"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion seccion-superficie" id="servicio" aria-labelledby="servicio-titulo">
+    <div class="wrap">
+      <h2 id="servicio-titulo">Nuestro servicio principal</h2>
+      <p class="section-lead">No vendemos piezas sueltas: entregamos un canal
+        que capta y pre-vende. Las dos partes trabajan juntas.</p>
+      <div class="grid-2">
+        <article class="card">
+          <h3>Landing de alto impacto</h3>
+          <p>Página rápida, clara y orientada a la acción: qué resolvés, pruebas,
+            planes y un canal directo para que el visitante deje sus datos o
+            escriba al instante.</p>
+        </article>
+        <article class="card">
+          <h3>Agente comercial IA</h3>
+          <p>Un vendedor digital que responde con tu información real, califica
+            el interés, agenda turnos y deriva a una persona cuando la
+            conversación lo necesita.</p>
+        </article>
+      </div>
+      <p class="nota">La landing recoge el interés; el agente lo convierte en
+        una conversación de compra y el CRM lo deja registrado para el
+        seguimiento.</p>
+    </div>
+  </section>
+
+  <section class="seccion" id="contacto" aria-labelledby="contacto-titulo">
+    <div class="wrap wrap-estrecho">
+      <h2 id="contacto-titulo">Contanos qué necesitás</h2>
+      <p class="section-lead">Dejanos tus datos y agendamos una demo con tu
+        información real.</p>
+      <form id="form-lead" class="form-lead">
+        <div class="form-grid">
+          <div class="field">
+            <label for="f-nombre">Nombre</label>
+            <input id="f-nombre" name="name" type="text" autocomplete="name" maxlength="200" aria-describedby="form-hint">
+          </div>
+          <div class="field">
+            <label for="f-empresa">Empresa <span class="opcional">(opcional)</span></label>
+            <input id="f-empresa" name="company" type="text" autocomplete="organization" maxlength="200">
+          </div>
+          <div class="field">
+            <label for="f-email">Email</label>
+            <input id="f-email" name="email" type="email" autocomplete="email" maxlength="200" aria-describedby="form-hint">
+          </div>
+          <div class="field">
+            <label for="f-telefono">Teléfono</label>
+            <input id="f-telefono" name="phone" type="tel" autocomplete="tel" maxlength="100" aria-describedby="form-hint">
+          </div>
+          <div class="field field-ancho">
+            <label for="f-mensaje">¿Qué necesitás?</label>
+            <textarea id="f-mensaje" name="message" rows="4" maxlength="2000"
+              placeholder="Contanos brevemente tu negocio y qué querés resolver."></textarea>
+          </div>
+        </div>
+        <p class="form-hint" id="form-hint">Dejanos al menos tu nombre, email o teléfono para
+          poder contactarte.</p>
+        <button class="btn btn-primary" id="form-enviar" type="submit">Enviar consulta</button>
+        <p class="form-estado" id="form-estado" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-grid">
+    <div>
+      <p class="footer-brand">Agent Ventas</p>
+      <p>Sistemas de captación con IA para negocios que no pueden dejar una
+        consulta sin responder.</p>
+    </div>
+    <div>
+      <h2 class="footer-titulo">Contacto</h2>
+      <ul class="footer-contacto" id="footer-contacto">
+        <li id="footer-horario" hidden></li>
+        <li id="footer-telefono" hidden></li>
+        <li id="footer-whatsapp" hidden></li>
+      </ul>
+      <p><a href="#contacto">Escribinos desde el formulario de contacto</a>.</p>
+    </div>
+    <nav class="footer-nav" aria-label="Enlaces del pie">
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#planes">Planes</a>
+      <a href="#probar">Probar el agente</a>
+    </nav>
+  </div>
+  <div class="wrap footer-base">
+    <p>© 2026 Agent Ventas.</p>
+  </div>
+</footer>
+
+</body>
+</html>

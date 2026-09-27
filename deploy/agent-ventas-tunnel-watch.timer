@@ -1,0 +1,14 @@
+; Cada minuto: si la URL del quick tunnel cambió, redeploya la landing.
+; Si no cambió, update-tunnel-url.sh sale en <1s sin hacer nada.
+
+[Unit]
+Description=Watcher de URL de tunnel de Agent Ventas (cada 1 min)
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

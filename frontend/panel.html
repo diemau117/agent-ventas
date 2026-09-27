@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel de Control — Agent Ventas</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232652b4'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='Georgia,serif'%3EA%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="/panel">Agent Ventas</a>
+      <nav class="nav">
+        <a href="#dashboard">Dashboard</a>
+        <a href="#leads">Leads</a>
+        <a href="#citas">Citas</a>
+        <a href="#config">Configuración</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="panel">
+    <div class="wrap">
+      <h1>Panel de Control</h1>
+
+      <!-- Dashboard -->
+      <section id="dashboard" class="seccion">
+        <h2>Dashboard</h2>
+        <div class="grid-3">
+          <article class="card">
+            <h3>Leads totales</h3>
+            <p class="metrica" id="leads-totales">0</p>
+          </article>
+          <article class="card">
+            <h3>Citas agendadas</h3>
+            <p class="metrica" id="citas-totales">0</p>
+          </article>
+          <article class="card">
+            <h3>Conversaciones hoy</h3>
+            <p class="metrica" id="conversaciones-hoy">0</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Leads -->
+      <section id="leads" class="seccion">
+        <h2>Leads</h2>
+        <div id="leads-lista" class="lista-leads">
+          <p class="nota">Cargando leads...</p>
+        </div>
+      </section>
+
+      <!-- Citas -->
+      <section id="citas" class="seccion">
+        <h2>Citas</h2>
+        <div id="citas-lista" class="lista-citas">
+          <p class="nota">Cargando citas...</p>
+        </div>
+      </section>
+
+      <!-- Configuración -->
+      <section id="config" class="seccion">
+        <h2>Configuración</h2>
+        <form id="form-config" class="form-lead">
+          <div class="form-grid">
+            <div class="field">
+              <label for="c-nombre">Nombre del negocio</label>
+              <input id="c-nombre" name="name" type="text" maxlength="200">
+            </div>
+            <div class="field">
+              <label for="c-agent">Nombre del agente</label>
+              <input id="c-agent" name="agent_name" type="text" maxlength="100">
+            </div>
+            <div class="field">
+              <label for="c-telefono">Teléfono</label>
+              <input id="c-telefono" name="phone" type="tel" maxlength="100">
+            </div>
+            <div class="field">
+              <label for="c-whatsapp">WhatsApp</label>
+              <input id="c-whatsapp" name="whatsapp" type="tel" maxlength="100">
+            </div>
+            <div class="field field-ancho">
+              <label for="c-descripcion">Descripción</label>
+              <textarea id="c-descripcion" name="description" rows="3" maxlength="1000"></textarea>
+            </div>
+          </div>
+          <button class="btn btn-primary" type="submit">Guardar cambios</button>
+          <p class="form-estado" id="config-estado" role="status" aria-live="polite"></p>
+        </form>
+
+        <h3>Widget</h3>
+        <p class="nota">Copiá este código y pegalo en tu sitio web:</p>
+        <pre class="codigo"><code id="widget-code"></code></pre>
+        <button class="btn btn-ghost" onclick="copiarWidget()">Copiar código</button>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    // Obtener token de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const TOKEN = urlParams.get('token');
+
+    if (!TOKEN) {
+      window.location.href = '/';
+    }
+
+    // Cargar datos
+    async function cargarDashboard() {
+      try {
+        const res = await fetch('/api/panel/dashboard?token=' + TOKEN);
+        const data = await res.json();
+        document.getElementById('leads-totales').textContent = data.leads || 0;
+        document.getElementById('citas-totales').textContent = data.citas || 0;
+        document.getElementById('conversaciones-hoy').textContent = data.conversaciones_hoy || 0;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function cargarLeads() {
+      try {
+        const res = await fetch('/api/panel/leads?token=' + TOKEN);
+        const leads = await res.json();
+        const lista = document.getElementById('leads-lista');
+        if (leads.length === 0) {
+          lista.innerHTML = '<p class="nota">No hay leads todavía.</p>';
+          return;
+        }
+        lista.innerHTML = leads.map(l => `
+          <div class="lead-item">
+            <strong>${l.name || 'Sin nombre'}</strong>
+            <span>${l.email || ''} ${l.phone || ''}</span>
+            <span class="badge">${l.status || 'new'}</span>
+            <p>${l.need || ''}</p>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function cargarCitas() {
+      try {
+        const res = await fetch('/api/panel/appointments?token=' + TOKEN);
+        const citas = await res.json();
+        const lista = document.getElementById('citas-lista');
+        if (citas.length === 0) {
+          lista.innerHTML = '<p class="nota">No hay citas todavía.</p>';
+          return;
+        }
+        lista.innerHTML = citas.map(c => `
+          <div class="cita-item">
+            <strong>${c.customer_name || 'Sin nombre'}</strong>
+            <span>${c.start || ''}</span>
+            <span class="badge">${c.status || 'confirmed'}</span>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function cargarConfig() {
+      try {
+        const res = await fetch('/api/panel/config?token=' + TOKEN);
+        const config = await res.json();
+        document.getElementById('c-nombre').value = config.name || '';
+        document.getElementById('c-agent').value = config.agent_name || '';
+        document.getElementById('c-telefono').value = config.phone || '';
+        document.getElementById('c-whatsapp').value = config.whatsapp || '';
+        document.getElementById('c-descripcion').value = config.description || '';
+        document.getElementById('widget-code').textContent = `<script src="https://agente.tudominio.com/widget.js?token=${TOKEN}"><\/script>`;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function copiarWidget() {
+      const code = document.getElementById('widget-code').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        alert('Código copiado al portapapeles');
+      });
+    }
+
+    // Guardar configuración
+    document.getElementById('form-config').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const estado = document.getElementById('config-estado');
+      estado.textContent = 'Guardando...';
+
+      const data = {
+        name: document.getElementById('c-nombre').value,
+        agent_name: document.getElementById('c-agent').value,
+        phone: document.getElementById('c-telefono').value,
+        whatsapp: document.getElementById('c-whatsapp').value,
+        description: document.getElementById('c-descripcion').value,
+      };
+
+      try {
+        const res = await fetch('/api/panel/config?token=' + TOKEN, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          estado.textContent = '¡Cambios guardados!';
+          estado.style.color = 'green';
+        } else {
+          estado.textContent = 'Error al guardar';
+          estado.style.color = 'red';
+        }
+      } catch (err) {
+        estado.textContent = 'Error de conexión';
+        estado.style.color = 'red';
+      }
+    });
+
+    // Cargar todo
+    cargarDashboard();
+    cargarLeads();
+    cargarCitas();
+    cargarConfig();
+  </script>
+</body>
+</html>

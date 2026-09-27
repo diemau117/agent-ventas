@@ -1,0 +1,20 @@
+; Quick tunnel de cloudflared hacia la API local.
+; La URL *.trycloudflare.com cambia en cada reinicio → el timer
+; agent-ventas-tunnel-watch.timer la propaga al Worker de la landing.
+; Esta unidad NO sustituye a ~/.config/systemd/user/cloudflared.service (n8n).
+
+[Unit]
+Description=Cloudflared quick tunnel -> 127.0.0.1:8000 (Agent Ventas)
+After=agent-ventas.service
+Wants=agent-ventas.service
+
+[Service]
+ExecStart=/usr/sbin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000
+Restart=always
+RestartSec=10
+# %h se expande al home del usuario; append evita truncar el historial de URLs.
+StandardOutput=append:%h/agent-ventas-tunnel.log
+StandardError=append:%h/agent-ventas-tunnel.log
+
+[Install]
+WantedBy=default.target

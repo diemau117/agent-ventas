@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Onboarding — Agent Ventas</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232652b4'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='Georgia,serif'%3EA%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="onboarding">
+    <div class="wrap wrap-estrecho">
+      <h1>Configurá tu agente</h1>
+      <p class="section-lead">Completá estos pasos y tu agente estará listo en minutos.</p>
+
+      <form id="form-onboarding" class="form-lead">
+        <div class="form-grid">
+          <div class="field">
+            <label for="o-nombre">Nombre del negocio *</label>
+            <input id="o-nombre" name="name" type="text" required maxlength="200">
+          </div>
+          <div class="field">
+            <label for="o-agent">Nombre del agente</label>
+            <input id="o-agent" name="agent_name" type="text" maxlength="100" placeholder="Sofi" value="Sofi">
+          </div>
+          <div class="field">
+            <label for="o-email">Email *</label>
+            <input id="o-email" name="email" type="email" required maxlength="200">
+          </div>
+          <div class="field">
+            <label for="o-telefono">Teléfono / WhatsApp</label>
+            <input id="o-telefono" name="phone" type="tel" maxlength="100">
+          </div>
+          <div class="field field-ancho">
+            <label for="o-descripcion">¿Qué vendés? *</label>
+            <textarea id="o-descripcion" name="description" rows="3" required maxlength="1000" placeholder="Ej: Servicios dentales, venta de ropa, asesoría legal..."></textarea>
+          </div>
+          <div class="field field-ancho">
+            <label for="o-catalogo">Catálogo (pegá texto o describa sus productos)</label>
+            <textarea id="o-catalogo" name="catalog" rows="6" maxlength="5000" placeholder="Ej:&#10;- Limpieza dental: $50&#10;- Ortodoncia: $800&#10;- Blanqueamiento: $150&#10;&#10;Horarios: Lunes a Viernes 9-18hs&#10;Dirección: Av. Principal 123"></textarea>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="onboarding-enviar" type="submit">Crear mi agente</button>
+        <p class="form-estado" id="onboarding-estado" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    document.getElementById('form-onboarding').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const estado = document.getElementById('onboarding-estado');
+      estado.textContent = 'Creando tu agente...';
+
+      const data = {
+        name: document.getElementById('o-nombre').value,
+        agent_name: document.getElementById('o-agent').value,
+        email: document.getElementById('o-email').value,
+        phone: document.getElementById('o-telefono').value,
+        description: document.getElementById('o-descripcion').value,
+        catalog: document.getElementById('o-catalogo').value,
+      };
+
+      try {
+        const res = await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        if (res.ok) {
+          const token = result.crm_token;
+          estado.innerHTML = '¡Agente creado! Redirigiendo al panel...';
+          estado.style.color = 'green';
+          setTimeout(() => {
+            window.location.href = '/panel?token=' + token;
+          }, 1500);
+        } else {
+          estado.textContent = result.detail || 'Error al crear el agente';
+          estado.style.color = 'red';
+        }
+      } catch (err) {
+        estado.textContent = 'Error de conexión';
+        estado.style.color = 'red';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+# Dev/CI — pytest vive acá y no en requirements.txt para que la imagen de
+# runtime (Dockerfile) no lleve el test runner instalado.
+-r requirements.txt
+pytest==9.1.1

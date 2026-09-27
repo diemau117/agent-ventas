@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+deploy/.last_tunnel_url
+.wrangler/
+*.db
+*.sqlite
+*.sqlite3
+backups/

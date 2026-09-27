@@ -1,0 +1,23 @@
+; Agent Ventas — API uvicorn en loopback.
+; Unidad de USUARIO: instalación manual, ver deploy/README.md.
+; NO iniciar con sudo ni tocar ~/.config/systemd/user/cloudflared.service (es de n8n).
+
+[Unit]
+Description=Agent Ventas API (uvicorn 127.0.0.1:8000)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/diego/Factory/agent-ventas
+# .env en formato KEY=valor (mismo estilo que docker compose lo lee).
+EnvironmentFile=/home/diego/Factory/agent-ventas/.env
+# uvicorn/alembic viven en ~/.local/bin; el PATH del usuario de systemd
+# no incluye ese directorio si no se configura en el módulo de login.
+Environment=PATH=/home/diego/.local/bin:/home/diego/.local/share/node-v24/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/diego/.local/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

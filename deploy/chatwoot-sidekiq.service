@@ -1,0 +1,20 @@
+; Sidekiq de Chatwoot — ENTREGA DE WEBHOOKS al agente (si no corre, la
+; respuesta del humano nunca llega al widget). El -C es obligatorio: sin
+; config/sidekiq.yml solo procesa la cola default y EventDispatcherJob /
+; WebhookJob quedan atascados en critical/high (verificado 2026-09-26).
+
+[Unit]
+Description=Chatwoot Sidekiq (webhooks y jobs)
+After=chatwoot-db.service chatwoot-valkey.service
+Wants=chatwoot-db.service chatwoot-valkey.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/diego/chatwoot
+Environment=PATH=/home/diego/.local/bin:/home/diego/.local/ruby-3.4.4/bin:/home/diego/.local/share/node-v24/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/diego/.local/ruby-3.4.4/bin/bundle exec sidekiq -C config/sidekiq.yml
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
