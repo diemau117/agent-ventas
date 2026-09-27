@@ -48,6 +48,7 @@ for _mod in (
     "app.api.routes.crm",
     "app.api.routes.onboarding",
     "app.api.routes.panel",
+    "app.api.routes.control_center",
     "app.api.routes.whatsapp",
     "app.api.routes.stripe",
 ):

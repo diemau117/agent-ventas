@@ -3,9 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Panel de Control — Agent Ventas</title>
+  <title>Centro de Control — Agent Ventas</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232652b4'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='Georgia,serif'%3EA%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .temp-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .temp-caliente { background: #fee2e2; color: #dc2626; }
+    .temp-tibio { background: #fef3c7; color: #d97706; }
+    .temp-frio { background: #dbeafe; color: #2563eb; }
+    .lead-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; background: #fff; }
+    .lead-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .lead-name { font-size: 16px; font-weight: 600; margin: 0; }
+    .lead-info { font-size: 13px; color: #6b7280; margin: 4px 0; }
+    .lead-message { font-size: 13px; color: #374151; background: #f9fafb; padding: 8px; border-radius: 6px; margin: 8px 0; font-style: italic; }
+    .lead-appointment { font-size: 13px; color: #059669; margin: 4px 0; }
+    .lead-action { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-top: 8px; }
+    .action-llamar { background: #dbeafe; color: #1d4ed8; }
+    .action-confirmar { background: #d1fae5; color: #047857; }
+    .action-propuesta { background: #fef3c7; color: #b45309; }
+    .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: #f9fafb; padding: 16px; border-radius: 8px; text-align: center; }
+    .stat-number { font-size: 28px; font-weight: 700; color: #111827; }
+    .stat-label { font-size: 12px; color: #6b7280; margin-top: 4px; }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -15,84 +35,55 @@
         <a href="#dashboard">Dashboard</a>
         <a href="#leads">Leads</a>
         <a href="#citas">Citas</a>
-        <a href="#config">Configuración</a>
       </nav>
     </div>
   </header>
 
   <main class="panel">
     <div class="wrap">
-      <h1>Panel de Control</h1>
+      <h1>Centro de Control</h1>
 
       <!-- Dashboard -->
       <section id="dashboard" class="seccion">
-        <h2>Dashboard</h2>
-        <div class="grid-3">
-          <article class="card">
-            <h3>Leads totales</h3>
-            <p class="metrica" id="leads-totales">0</p>
-          </article>
-          <article class="card">
-            <h3>Citas agendadas</h3>
-            <p class="metrica" id="citas-totales">0</p>
-          </article>
-          <article class="card">
-            <h3>Conversaciones hoy</h3>
-            <p class="metrica" id="conversaciones-hoy">0</p>
-          </article>
+        <h2>Resumen</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number" id="stat-total">0</div>
+            <div class="stat-label">Leads totales</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="stat-hoy">0</div>
+            <div class="stat-label">Leads hoy</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="stat-calientes">0</div>
+            <div class="stat-label">🔥 Calientes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="stat-citas">0</div>
+            <div class="stat-label">Citas pendientes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="stat-activas">0</div>
+            <div class="stat-label">Conversaciones activas</div>
+          </div>
         </div>
       </section>
 
       <!-- Leads -->
       <section id="leads" class="seccion">
         <h2>Leads</h2>
-        <div id="leads-lista" class="lista-leads">
+        <div id="leads-lista">
           <p class="nota">Cargando leads...</p>
         </div>
       </section>
 
       <!-- Citas -->
       <section id="citas" class="seccion">
-        <h2>Citas</h2>
-        <div id="citas-lista" class="lista-citas">
+        <h2>Citas agendadas</h2>
+        <div id="citas-lista">
           <p class="nota">Cargando citas...</p>
         </div>
-      </section>
-
-      <!-- Configuración -->
-      <section id="config" class="seccion">
-        <h2>Configuración</h2>
-        <form id="form-config" class="form-lead">
-          <div class="form-grid">
-            <div class="field">
-              <label for="c-nombre">Nombre del negocio</label>
-              <input id="c-nombre" name="name" type="text" maxlength="200">
-            </div>
-            <div class="field">
-              <label for="c-agent">Nombre del agente</label>
-              <input id="c-agent" name="agent_name" type="text" maxlength="100">
-            </div>
-            <div class="field">
-              <label for="c-telefono">Teléfono</label>
-              <input id="c-telefono" name="phone" type="tel" maxlength="100">
-            </div>
-            <div class="field">
-              <label for="c-whatsapp">WhatsApp</label>
-              <input id="c-whatsapp" name="whatsapp" type="tel" maxlength="100">
-            </div>
-            <div class="field field-ancho">
-              <label for="c-descripcion">Descripción</label>
-              <textarea id="c-descripcion" name="description" rows="3" maxlength="1000"></textarea>
-            </div>
-          </div>
-          <button class="btn btn-primary" type="submit">Guardar cambios</button>
-          <p class="form-estado" id="config-estado" role="status" aria-live="polite"></p>
-        </form>
-
-        <h3>Widget</h3>
-        <p class="nota">Copiá este código y pegalo en tu sitio web:</p>
-        <pre class="codigo"><code id="widget-code"></code></pre>
-        <button class="btn btn-ghost" onclick="copiarWidget()">Copiar código</button>
       </section>
     </div>
   </main>
@@ -106,55 +97,101 @@
       window.location.href = '/';
     }
 
-    // Cargar datos
+    // Cargar dashboard
     async function cargarDashboard() {
       try {
-        const res = await fetch('/api/panel/dashboard?token=' + TOKEN);
+        const res = await fetch('/api/control-center/stats?token=' + TOKEN);
         const data = await res.json();
-        document.getElementById('leads-totales').textContent = data.leads || 0;
-        document.getElementById('citas-totales').textContent = data.citas || 0;
-        document.getElementById('conversaciones-hoy').textContent = data.conversaciones_hoy || 0;
+        document.getElementById('stat-total').textContent = data.total_leads || 0;
+        document.getElementById('stat-hoy').textContent = data.leads_hoy || 0;
+        document.getElementById('stat-calientes').textContent = data.leads_calientes || 0;
+        document.getElementById('stat-citas').textContent = data.citas_pendientes || 0;
+        document.getElementById('stat-activas').textContent = data.conversaciones_activas || 0;
       } catch (err) {
         console.error(err);
       }
     }
 
+    // Cargar leads
     async function cargarLeads() {
       try {
-        const res = await fetch('/api/panel/leads?token=' + TOKEN);
+        const res = await fetch('/api/control-center/leads?token=' + TOKEN);
         const leads = await res.json();
         const lista = document.getElementById('leads-lista');
+
         if (leads.length === 0) {
           lista.innerHTML = '<p class="nota">No hay leads todavía.</p>';
           return;
         }
-        lista.innerHTML = leads.map(l => `
-          <div class="lead-item">
-            <strong>${l.name || 'Sin nombre'}</strong>
-            <span>${l.email || ''} ${l.phone || ''}</span>
-            <span class="badge">${l.status || 'new'}</span>
-            <p>${l.need || ''}</p>
-          </div>
-        `).join('');
+
+        lista.innerHTML = leads.map(l => {
+          const tempClass = l.temperature_raw === 'caliente' ? 'temp-caliente' :
+                          l.temperature_raw === 'tibio' ? 'temp-tibio' : 'temp-frio';
+
+          const apptHtml = l.appointment
+            ? `<div class="lead-appointment">📅 Cita: ${new Date(l.appointment.start).toLocaleString('es')} — ${l.appointment.customer_name || 'Sin nombre'} (${l.appointment.contact || 'Sin contacto'})</div>`
+            : '';
+
+          const actionClass = l.next_action === 'llamar' ? 'action-llamar' :
+                             l.next_action === 'confirmar cita' ? 'action-confirmar' : 'action-propuesta';
+          const actionText = l.next_action === 'llamar' ? '📞 Llamar' :
+                            l.next_action === 'confirmar cita' ? '✅ Confirmar cita' : '📄 Enviar propuesta';
+
+          return `
+            <div class="lead-card">
+              <div class="lead-header">
+                <div>
+                  <p class="lead-name">${l.name || 'Sin nombre'}</p>
+                  <div class="lead-info">
+                    ${l.company ? `<span>🏢 ${l.company}</span>` : ''}
+                    ${l.email ? `<span>✉️ ${l.email}</span>` : ''}
+                    ${l.phone ? `<span>📱 ${l.phone}</span>` : ''}
+                    <span>Canal: ${l.channel}</span>
+                  </div>
+                </div>
+                <span class="temp-badge ${tempClass}">${l.temperature} ${l.temperature_raw}</span>
+              </div>
+              ${l.need ? `<div class="lead-info">💡 Necesidad: ${l.need}</div>` : ''}
+              ${l.budget ? `<div class="lead-info">💰 Presupuesto: ${l.budget}</div>` : ''}
+              ${l.urgency ? `<div class="lead-info">⏰ Urgencia: ${l.urgency}</div>` : ''}
+              ${l.last_message ? `<div class="lead-message">"${l.last_message}"</div>` : ''}
+              ${apptHtml}
+              ${l.ai_summary ? `<div class="lead-info">🤖 Resumen IA: ${l.ai_summary}</div>` : ''}
+              <span class="lead-action ${actionClass}">${actionText}</span>
+            </div>
+          `;
+        }).join('');
       } catch (err) {
         console.error(err);
       }
     }
 
+    // Cargar citas
     async function cargarCitas() {
       try {
         const res = await fetch('/api/panel/appointments?token=' + TOKEN);
         const citas = await res.json();
         const lista = document.getElementById('citas-lista');
+
         if (citas.length === 0) {
           lista.innerHTML = '<p class="nota">No hay citas todavía.</p>';
           return;
         }
+
         lista.innerHTML = citas.map(c => `
-          <div class="cita-item">
-            <strong>${c.customer_name || 'Sin nombre'}</strong>
-            <span>${c.start || ''}</span>
-            <span class="badge">${c.status || 'confirmed'}</span>
+          <div class="lead-card">
+            <div class="lead-header">
+              <div>
+                <p class="lead-name">${c.customer_name || 'Sin nombre'}</p>
+                <div class="lead-info">
+                  ${c.contact ? `<span>📱 ${c.contact}</span>` : ''}
+                  ${c.company ? `<span>🏢 ${c.company}</span>` : ''}
+                </div>
+              </div>
+              <span class="temp-badge temp-caliente">📅 ${new Date(c.start).toLocaleString('es')}</span>
+            </div>
+            ${c.need ? `<div class="lead-info">💡 Necesidad: ${c.need}</div>` : ''}
+            ${c.context ? `<div class="lead-message">"${c.context}"</div>` : ''}
           </div>
         `).join('');
       } catch (err) {
@@ -162,66 +199,17 @@
       }
     }
 
-    async function cargarConfig() {
-      try {
-        const res = await fetch('/api/panel/config?token=' + TOKEN);
-        const config = await res.json();
-        document.getElementById('c-nombre').value = config.name || '';
-        document.getElementById('c-agent').value = config.agent_name || '';
-        document.getElementById('c-telefono').value = config.phone || '';
-        document.getElementById('c-whatsapp').value = config.whatsapp || '';
-        document.getElementById('c-descripcion').value = config.description || '';
-        document.getElementById('widget-code').textContent = `<script src="https://agente.tudominio.com/widget.js?token=${TOKEN}"><\/script>`;
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    function copiarWidget() {
-      const code = document.getElementById('widget-code').textContent;
-      navigator.clipboard.writeText(code).then(() => {
-        alert('Código copiado al portapapeles');
-      });
-    }
-
-    // Guardar configuración
-    document.getElementById('form-config').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const estado = document.getElementById('config-estado');
-      estado.textContent = 'Guardando...';
-
-      const data = {
-        name: document.getElementById('c-nombre').value,
-        agent_name: document.getElementById('c-agent').value,
-        phone: document.getElementById('c-telefono').value,
-        whatsapp: document.getElementById('c-whatsapp').value,
-        description: document.getElementById('c-descripcion').value,
-      };
-
-      try {
-        const res = await fetch('/api/panel/config?token=' + TOKEN, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        if (res.ok) {
-          estado.textContent = '¡Cambios guardados!';
-          estado.style.color = 'green';
-        } else {
-          estado.textContent = 'Error al guardar';
-          estado.style.color = 'red';
-        }
-      } catch (err) {
-        estado.textContent = 'Error de conexión';
-        estado.style.color = 'red';
-      }
-    });
-
     // Cargar todo
     cargarDashboard();
     cargarLeads();
     cargarCitas();
-    cargarConfig();
+
+    // Refrescar cada 30 segundos
+    setInterval(() => {
+      cargarDashboard();
+      cargarLeads();
+      cargarCitas();
+    }, 30000);
   </script>
 </body>
 </html>
