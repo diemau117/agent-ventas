@@ -15,7 +15,13 @@ def get_engine():
     Esto permite que la app arranque incluso si la base de datos no está
     disponible. La conexión se establece solo cuando se necesita.
     """
-    return create_engine(settings.database_url, pool_pre_ping=True)
+    url = settings.database_url
+    connect_args = {}
+    # psycopg2 + Render PostgreSQL: sslmode como connect_arg es más confiable
+    # que en la URL (evita "SSL connection has been closed unexpectedly")
+    if "sslmode" not in url:
+        connect_args["sslmode"] = "require"
+    return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
 
 @lru_cache

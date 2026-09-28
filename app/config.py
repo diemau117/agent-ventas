@@ -75,13 +75,12 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _db_url(cls, v: str) -> str:
-        """Agrega sslmode=require para Render PostgreSQL.
+        """Limpia la URL de base de datos.
 
-        Render PostgreSQL REQUIERE SSL (FATAL: SSL/TLS required si no).
-        psycopg (v3) maneja el handshake SSL correctamente.
+        No agregamos sslmode aquí — se pasa como connect_arg en database.py
+        para que psycopg2 lo maneje correctamente (evita "SSL connection has
+        been closed unexpectedly").
         """
-        if v and "sslmode" not in v:
-            v = v + "?sslmode=require"
         return v
 
     @property
