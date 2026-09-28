@@ -1,12 +1,13 @@
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     # entorno: "dev" | "prod". En prod aplica fail-fast (ver validate_runtime).
-    app_env: str = "dev"
+    # Acepta tanto APP_ENV como ENVIRONMENT (Render usa ENVIRONMENT por defecto).
+    app_env: str = Field(default="dev", validation_alias=AliasChoices("APP_ENV", "ENVIRONMENT"))
     groq_api_key: str = ""
     llm_model: str = "openai/gpt-oss-20b"
     database_url: str = "postgresql+psycopg2://agent@127.0.0.1:5433/agent_ventas"
