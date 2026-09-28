@@ -83,7 +83,7 @@ class Settings(BaseSettings):
         if v and v.startswith("postgresql://"):
             v = v.replace("postgresql://", "postgresql+psycopg2://", 1)
         if v and "sslmode" not in v:
-            v = v + "?sslmode=prefer"
+            v = v + "?sslmode=disable"
         return v
 
     @property
