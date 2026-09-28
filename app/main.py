@@ -17,7 +17,13 @@ FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 async def lifespan(app: FastAPI):
     # Fail-fast: en prod no se arranca sin GROQ_API_KEY ni con DB local.
     settings.validate_runtime()
-    init_db()
+    # init_db() es opcional: si la BD no está disponible, la app arranca
+    # de todas formas y maneja el error cuando se necesite la BD.
+    try:
+        init_db()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"init_db() falló (app arranca sin BD): {e}")
     yield
 
 
