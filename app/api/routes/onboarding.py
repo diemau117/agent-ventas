@@ -19,7 +19,7 @@ class OnboardingRequest(BaseModel):
     agent_name: str = "Sofi"
 
 
-@router.post("/api/onboarding")
+@router.post("/onboarding")
 async def create_business(data: OnboardingRequest, db: Session = Depends(get_db)):
     """Crea un negocio nuevo y devuelve su token de acceso al panel."""
     
