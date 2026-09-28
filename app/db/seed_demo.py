@@ -1,5 +1,5 @@
 """Seed demo idempotente: 1 negocio + 5 productos. Uso: python -m app.db.seed_demo"""
-from app.db.database import SessionLocal, init_db
+from app.db.database import get_session_local, init_db
 from app.db.models import Business, Product
 
 PRODUCTS = [
@@ -34,7 +34,7 @@ def _seed_business(db, name, description, products, persona="consultiva"):
 
 def main() -> None:
     init_db()
-    db = SessionLocal()
+    db = get_session_local()()
     try:
         b1 = _seed_business(db, "Tienda Demo", "Tienda de café de especialidad y accesorios.",
                             PRODUCTS, persona="cercana")

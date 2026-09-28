@@ -4,7 +4,7 @@ Uso: python -m app.rag.seed_knowledge
 Carga conocimiento para los negocios del seed_demo ("Tienda Demo" y "Sereno").
 Idempotente por (business_id, title): si el título ya existe, no lo duplica.
 """
-from app.db.database import SessionLocal, init_db
+from app.db.database import get_session_local, init_db
 from app.db.models import KNOWLEDGE_CATEGORIES, Business, Knowledge
 
 # (categoría, título, contenido, keywords)
@@ -162,7 +162,7 @@ def seed_knowledge(db) -> int:
 
 def main() -> None:
     init_db()
-    db = SessionLocal()
+    db = get_session_local()()
     try:
         created = seed_knowledge(db)
         print(f"seed knowledge ok: {created} docs nuevos")

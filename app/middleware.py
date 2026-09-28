@@ -14,7 +14,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp
 
 from app.config import settings
-from app.db.database import SessionLocal
+from app.db.database import get_session_local
 from app.db.models import RateLimitBucket
 
 # Solo endpoints que ejecutan LLM/costos: /health y /ready quedan libres.
@@ -70,7 +70,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.window_seconds = float(window_seconds)
         self.limit = settings.rate_limit_per_min if limit is None else int(limit)
-        self.session_factory = session_factory or SessionLocal
+        self.session_factory = session_factory or get_session_local()
         self.clock = clock
 
     async def dispatch(self, request: Request, call_next) -> Response:
