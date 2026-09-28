@@ -90,7 +90,7 @@ async def sales():
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
-@app.get("/onboarding")
+@app.get("/onboarding-page")
 async def onboarding():
     """Página de onboarding para nuevos clientes."""
     html = (FRONTEND / "onboarding.html").read_text(encoding="utf-8")
