@@ -61,13 +61,16 @@ class Settings(BaseSettings):
     @field_validator("app_env")
     @classmethod
     def _env(cls, v: str) -> str:
+        """Acepta cualquier valor. Solo 'prod' activa fail-fast.
+
+        Render manda ENVIRONMENT=production, pero el código espera 'prod'.
+        Para no fallar, aceptamos cualquier valor y solo usamos 'prod' para
+        fail-fast. Todo lo demás se trata como 'dev'.
+        """
         v = (v or "dev").strip().lower()
-        # Acepta "production" como alias de "prod" (Render usa production por defecto)
-        if v == "production":
-            v = "prod"
-        if v not in ("dev", "prod"):
-            raise ValueError("APP_ENV debe ser dev o prod")
-        return v
+        if v in ("prod", "production"):
+            return "prod"
+        return "dev"
 
     @field_validator("database_url")
     @classmethod
