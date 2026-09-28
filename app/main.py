@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import chat, health
+from app.api.routes import catalog, chat, control_center, crm, health, leads, onboarding, panel, stripe, webhook, whatsapp
 from app.config import settings
 from app.db.database import init_db
 
@@ -45,25 +45,17 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
-# Routers de la landing (catálogo, captación de leads) y del webhook de
-# Chatwoot. Prefijo /api; tolerantes a import faltante.
-for _mod in (
-    "app.api.routes.catalog",
-    "app.api.routes.leads",
-    "app.api.routes.webhook",
-    "app.api.routes.crm",
-    "app.api.routes.onboarding",
-    "app.api.routes.panel",
-    "app.api.routes.control_center",
-    "app.api.routes.whatsapp",
-    "app.api.routes.stripe",
-):
-    try:
-        _r = __import__(_mod, fromlist=["router"]).router
-        app.include_router(_r, prefix="/api")
-    except ImportError:  # pragma: no cover
-        pass
-
+# Routers de la API — inclusión explícita para que FastAPI registre las rutas
+# correctamente en app.routes (evita el mecanismo lazy _IncludedRouter).
+app.include_router(catalog.router, prefix="/api")
+app.include_router(leads.router, prefix="/api")
+app.include_router(webhook.router, prefix="/api")
+app.include_router(crm.router, prefix="/api")
+app.include_router(onboarding.router, prefix="/api")
+app.include_router(panel.router, prefix="/api")
+app.include_router(control_center.router, prefix="/api")
+app.include_router(whatsapp.router, prefix="/api")
+app.include_router(stripe.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(health.router)
 

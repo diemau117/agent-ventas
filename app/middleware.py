@@ -120,8 +120,36 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             db.close()
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Agrega headers de seguridad a todas las respuestas."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        
+        # Prevenir clickjacking
+        response.headers["X-Frame-Options"] = "DENY"
+        
+        # Prevenir MIME type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        
+        # XSS protection
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        
+        # Referrer policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        
+        # Content Security Policy (básica)
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+        
+        # HSTS (solo en producción)
+        if settings.is_prod:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        
+        return response
+
+
 def install_middlewares(app: FastAPI) -> None:
-    """CORS + rate limit persistente. Lo llama el orquestador desde main.py."""
+    """CORS + rate limit persistente + headers de seguridad. Lo llama el orquestador desde main.py."""
     origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
@@ -131,3 +159,4 @@ def install_middlewares(app: FastAPI) -> None:
         allow_credentials=False,
     )
     app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)

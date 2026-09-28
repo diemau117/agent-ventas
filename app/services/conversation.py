@@ -6,6 +6,7 @@ from app.agent.policies import BLOCKED_MARK, GREETING_MARK
 from app.config import settings
 from app.crm import apply_temperature, record_interaction, signals_from_conversation, upsert_lead
 from app.db.models import Business, Conversation, Message
+from app.limits import check_business_limits, check_conversation_limits
 from app.llm.base import LLMProvider
 from app.observability import log_event
 from app.services.customer import ensure_customer, profile_text
@@ -50,10 +51,16 @@ async def run_chat(
     biz = db.query(Business).filter_by(id=business_id).first()
     if not biz:
         raise LookupError("business_not_found")
+    
+    # Verificar límites del negocio antes de procesar
+    check_business_limits(db, biz)
+    
     if conversation_id:
         conv = db.query(Conversation).filter_by(id=conversation_id, business_id=business_id).first()
         if not conv:
             raise LookupError("conversation_not_found")
+        # Verificar límites de la conversación
+        check_conversation_limits(db, conversation_id)
     else:
         conv = Conversation(business_id=business_id, channel="web")
         db.add(conv)
