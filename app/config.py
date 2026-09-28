@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     @classmethod
     def _env(cls, v: str) -> str:
         v = (v or "dev").strip().lower()
+        # Acepta "production" como alias de "prod" (Render usa production por defecto)
+        if v == "production":
+            v = "prod"
         if v not in ("dev", "prod"):
             raise ValueError("APP_ENV debe ser dev o prod")
         return v
