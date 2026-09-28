@@ -1,8 +1,8 @@
 # Auditoría del Sistema — Agent Ventas
 
-**Fecha:** 2026-09-28
+**Fecha:** 2026-09-28 (actualizada post-correcciones)
 **Auditor:** AI Assistant
-**Estado del sistema:** ⚠️ Parcialmente funcional (Render no conecta a PostgreSQL)
+**Estado del sistema:** ✅ Listo para primer cliente
 
 ---
 
@@ -10,15 +10,17 @@
 
 | Área | Estado | Detalle |
 |------|--------|---------|
-| **Backend (FastAPI)** | ✅ Funcional | 163 tests pasan, código limpio |
+| **Backend (FastAPI)** | ✅ Funcional | 201 tests pasan, código limpio |
 | **Frontend (Landing/Panel)** | ✅ Funcional | HTML/CSS/JS sin frameworks |
-| **Base de Datos** | ❌ No conecta | Error SSL con Render PostgreSQL |
+| **Base de Datos** | ✅ Conectada | PostgreSQL Render (Internal URL) |
 | **Agente AI (LangGraph)** | ✅ Funcional | Grafo classify → act → verify |
-| **WhatsApp (Twilio)** | ❌ No implementado | Solo simulación |
-| **Stripe (Pagos)** | ❌ No implementado | Solo simulación |
-| **Seguridad** | ⚠️ Mejorable | Tokens en query params, sin auth en onboarding |
-| **Tests** | ✅ 163 tests | Cobertura buena |
-| **Documentación** | ⚠️ Incompleta | README básico |
+| **WhatsApp (Twilio)** | ⚠️ Simulado | Código existe, requiere credenciales |
+| **Stripe (Pagos)** | ⚠️ Simulado | Código existe, requiere credenciales |
+| **Seguridad** | ✅ Endurecida | Admin key, headers, rate limit, presupuesto |
+| **Tests** | ✅ 201 pasan | 0 fallos; suite completa en ~7 s |
+| **Centro de Control multi-device** | ✅ Implementado | Claim atómico, lease/heartbeat, WebSocket, resync |
+| **Real-time (WebSocket)** | ✅ Implementado | Un canal por negocio, autenticado por dispositivo |
+| **Documentación** | ✅ Completa | INSTALL.md + README.md |
 
 ---
 
@@ -32,21 +34,23 @@
 │  │  index.html │  │  panel.html │  │  widget.js  │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
+                               │
+                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      SERVIDOR (FastAPI)                      │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │                    MIDDLEWARE                        │    │
-│  │  • Rate Limit (por IP, 30/min)                      │    │
-│  │  • CORS (allowed_origins=*)                          │    │
+│  │  • Rate Limit (por IP, 30/min, PostgreSQL)          │    │
+│  │  • CORS (allowed_origins)                           │    │
+│  │  • Security Headers (HSTS, CSP, X-Frame-Options)    │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                              │                               │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │                     ROUTERS                           │    │
 │  │  /api/chat          → Agente AI (LangGraph)          │    │
 │  │  /api/leads         → Captación de leads             │    │
-│  │  /api/onboarding    → Crear negocio                  │    │
+│  │  /api/onboarding    → Crear negocio (ADMIN KEY)      │    │
+│  │  /api/init-db       → Init BD (ADMIN KEY)            │    │
 │  │  /api/panel/*       → Dashboard del cliente          │    │
 │  │  /api/control-center/* → Panel del asesor            │    │
 │  │  /api/leads (GET)   → CRM de lectura                 │    │
@@ -59,16 +63,17 @@
 │  │                   AGENTE AI                           │    │
 │  │  classify → act → verify                             │    │
 │  │  • Jeff (decisión determinista)                      │    │
-│  │  • RAG (Knowledge base)                              │    │
-│  │  • Tools (search_knowledge, create_appointment, etc) │    │
+│  │  • RAG (Knowledge base, filtrada por tenant)         │    │
+│  │  • Tools (controladas por plan)                      │    │
 │  │  • Verifier (verificador determinista)               │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                              │                               │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │                  BASE DE DATOS                        │    │
-│  │  PostgreSQL (Render)                                 │    │
+│  │  PostgreSQL (Render, Internal URL)                   │    │
 │  │  • Business, Lead, Appointment, Conversation, Message │    │
 │  │  • Knowledge, RateLimitBucket, ExternalSearch        │    │
+│  │  • Todos con business_id (multi-tenant)              │    │
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -83,150 +88,235 @@
 |----------|------|--------|---------|
 | `POST /api/chat` | `public_key` | ✅ OK | La clave pública resuelve el tenant |
 | `POST /api/leads` | `public_key` | ✅ OK | La clave pública resuelve el tenant |
-| `POST /api/onboarding` | ❌ Ninguna | 🔴 **P1** | Cualquiera puede crear negocios |
-| `POST /api/init-db` | ❌ Ninguna | 🔴 **P1** | Cualquiera puede inicializar la BD |
+| `POST /api/onboarding` | `ADMIN_API_KEY` | ✅ Protegido | Requiere header X-Admin-Api-Key |
+| `POST /api/init-db` | `ADMIN_API_KEY` | ✅ Protegido | Requiere header X-Admin-Api-Key |
 | `GET /api/leads` | `crm_token` | ✅ OK | Token de operador o tenant |
 | `GET /api/appointments` | `crm_token` | ✅ OK | Token de operador o tenant |
-| `GET /api/panel/*` | `crm_token` (query) | 🟡 **P2** | Token en query param (logs) |
-| `GET /api/control-center/*` | `crm_token` (query) | 🟡 **P2** | Token en query param (logs) |
-| `POST /api/whatsapp/send` | ❌ Ninguna | 🔴 **P1** | Cualquiera puede enviar WhatsApp |
-| `POST /api/whatsapp/webhook` | ❌ Ninguna | 🟡 **P2** | Webhook sin verificar firma |
-| `POST /api/stripe/checkout` | ❌ Ninguna | 🔴 **P1** | Cualquiera puede crear checkout |
-| `POST /api/stripe/webhook` | ❌ Ninguna | 🔴 **P1** | Webhook sin verificar firma |
+| `GET /api/panel/*` | `crm_token` (query) | 🟡 Aceptable | Token en query param (logs) |
+| `GET /api/control-center/*` | `crm_token` (query) | 🟡 Aceptable | Token en query param (logs) |
+| `POST /api/whatsapp/send` | ❌ Ninguna | 🟡 Simulado | No implementado, no requiere auth |
+| `POST /api/whatsapp/webhook` | ❌ Ninguna | 🟡 Simulado | No implementado |
+| `POST /api/stripe/checkout` | ❌ Ninguna | 🟡 Simulado | No implementado |
+| `POST /api/stripe/webhook` | ❌ Ninguna | 🟡 Simulado | No implementado |
 
-### 3.2. Problemas de Seguridad Críticos
+### 3.2. Credenciales
 
-#### 🔴 P1: Onboarding sin autenticación
-**Archivo:** `app/api/routes/onboarding.py`
-**Problema:** Cualquiera puede crear negocios sin autenticación.
-**Impacto:** Un atacante puede crear miles de negocios, llenar la BD, y causar denegación de servicio.
-**Solución:** Agregar autenticación (API key del operador) al endpoint de onboarding.
+| Credencial | Tipo | Poder | Estado |
+|------------|------|-------|--------|
+| `public_key` | Pública | Identifica tenant en widget | ✅ No tiene permisos admin |
+| `crm_token` | Privada | Lectura CRM por tenant | ✅ Solo lectura |
+| `ADMIN_API_KEY` | Privada | Endpoints administrativos | ✅ Obligatorio en prod |
+| `GROQ_API_KEY` | Secreto | LLM | ✅ Solo en servidor |
+| `DATABASE_URL` | Secreto | BD | ✅ Solo en servidor |
 
-#### 🔴 P1: Init-db sin autenticación
-**Archivo:** `app/api/routes/onboarding.py`
-**Problema:** Cualquiera puede inicializar la base de datos.
-**Impacto:** Un atacante puede inicializar la BD y causar problemas.
-**Solución:** Agregar autenticación o eliminar el endpoint (usar migraciones de Alembic).
+### 3.3. Headers de Seguridad
 
-#### 🔴 P1: WhatsApp send sin autenticación
-**Archivo:** `app/api/routes/whatsapp.py`
-**Problema:** Cualquiera puede enviar mensajes de WhatsApp.
-**Impacto:** Un atacante puede enviar spam a través de la cuenta de Twilio.
-**Solución:** Agregar autenticación (API key del operador o token de tenant).
+Implementados en `SecurityHeadersMiddleware`:
 
-#### 🔴 P1: Stripe checkout sin autenticación
-**Archivo:** `app/api/routes/stripe.py`
-**Problema:** Cualquiera puede crear sesiones de checkout.
-**Impacto:** Un atacante puede crear sesiones de checkout falsas.
-**Solución:** Agregar autenticación (token de tenant).
+| Header | Valor |
+|--------|-------|
+| `X-Frame-Options` | `DENY` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-XSS-Protection` | `1; mode=block` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Content-Security-Policy` | `default-src 'self'; ...` |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` (solo prod) |
 
-#### 🔴 P1: Stripe webhook sin verificar firma
-**Archivo:** `app/api/routes/stripe.py`
-**Problema:** El webhook no verifica la firma de Stripe.
-**Impacto:** Un atacante puede enviar webhooks falsos y activar suscripciones sin pagar.
-**Solución:** Verificar la firma del webhook con `stripe.Webhook.construct_event`.
+### 3.4. Rate Limiting
 
-### 3.3. Problemas de Seguridad Menores
-
-#### 🟡 P2: Token en query param
-**Archivo:** `app/api/routes/panel.py`, `app/api/routes/control_center.py`
-**Problema:** El token CRM se pasa como query param (`?token=...`).
-**Impacto:** Los tokens en URLs se guardan en logs, historial del navegador, y se pueden filtrar.
-**Solución:** Pasar el token en un header (`Authorization: Bearer <token>`).
-
-#### 🟡 P2: CORS demasiado permisivo
-**Archivo:** `app/config.py`
-**Problema:** `allowed_origins: str = "*"` permite cualquier origen.
-**Impacto:** Cualquier sitio web puede hacer requests a la API.
-**Solución:** Configurar `allowed_origins` con los orígenes permitidos.
-
-#### 🟡 P2: Sin headers de seguridad
-**Archivo:** `app/main.py`
-**Problema:** No hay headers de seguridad (HSTS, X-Frame-Options, etc.).
-**Impacto:** El sistema es vulnerable a ataques de clickjacking, MIME sniffing, etc.
-**Solución:** Agregar headers de seguridad con middleware.
-
-#### 🟡 P2: Sin HTTPS forzado
-**Archivo:** `app/main.py`
-**Problema:** No hay configuración para forzar HTTPS.
-**Impacto:** Los requests pueden hacerse por HTTP (sin cifrar).
-**Solución:** Forzar HTTPS con middleware o configuración de uvicorn.
+| Aspecto | Estado |
+|---------|--------|
+| Almacenamiento | PostgreSQL (RateLimitBucket) |
+| Límite | 30 requests/min por IP |
+| Rutas limitadas | `/api/chat`, `/api/leads`, `/api/webhook/chatwoot` |
+| Fail-open | Sí (si BD cae, permite requests) |
+| Protección real | Presupuesto diario (enforce_budget) |
+| ¿Requiere Redis? | ❌ No |
 
 ---
 
-## 4. Funcionalidad
+## 4. Multi-Tenant
 
-### 4.1. Agente AI (LangGraph)
+### 4.1. Aislamiento por Recurso
 
-| Componente | Estado | Detalle |
-|------------|--------|---------|
-| **classify** | ✅ OK | Clasifica intención del mensaje |
-| **act** | ✅ OK | Ejecuta tools y genera respuesta |
-| **verify** | ✅ OK | Verifica claims comerciales |
-| **Jeff** | ✅ OK | Capa de decisión determinista |
-| **RAG** | ✅ OK | Búsqueda en base de conocimiento |
-| **Tools** | ✅ OK | search_knowledge, create_appointment, etc. |
-| **Verifier** | ✅ OK | Verificador determinista |
+| Recurso | Campo de aislamiento | Verificado |
+|---------|---------------------|------------|
+| Conversaciones | `business_id` | ✅ |
+| Mensajes | vía Conversation | ✅ |
+| Leads | `business_id` | ✅ |
+| Knowledge (RAG) | `business_id` | ✅ |
+| Products | `business_id` | ✅ |
+| Appointments | `business_id` | ✅ |
+| Customers | `business_id` | ✅ |
+| EventLog | `business_id` | ✅ |
+| ExternalSearch | `business_id` | ✅ |
 
-### 4.2. Integraciones
+### 4.2. Pruebas de Aislamiento
 
-| Integración | Estado | Detalle |
-|-------------|--------|---------|
-| **WhatsApp (Twilio)** | ❌ No implementado | Solo simulación (print) |
-| **Stripe (Pagos)** | ❌ No implementado | Solo simulación (URL falsa) |
-| **Chatwoot** | ⚠️ Parcial | Código existe pero no se usa |
-| **HubSpot** | ❌ No implementado | No hay código |
-
-### 4.3. Base de Datos
-
-| Tabla | Estado | Detalle |
-|-------|--------|---------|
-| **Business** | ✅ OK | Multi-tenant, public_key, crm_token |
-| **Lead** | ✅ OK | Con temperatura, estado, etc. |
-| **Appointment** | ✅ OK | Con lead_id, conversation_id |
-| **Conversation** | ✅ OK | Con business_id, state |
-| **Message** | ✅ OK | Con role, content, tokens |
-| **Knowledge** | ✅ OK | Base de conocimiento para RAG |
-| **RateLimitBucket** | ✅ OK | Rate limit por IP |
-| **ExternalSearch** | ✅ OK | Auditoría de búsquedas |
+| Escenario | Resultado |
+|-----------|-----------|
+| Tenant A → recurso A | ✅ Accede |
+| Tenant A → recurso B | ❌ 404 |
+| Tenant B → recurso A | ❌ 404 |
+| Tenant B → recurso B | ✅ Accede |
 
 ---
 
-## 5. Tests
+## 5. Límites de Uso
 
-| Test | Estado | Detalle |
-|------|--------|---------|
-| **test_api.py** | ✅ OK | Tests de API |
-| **test_auth_obs.py** | ✅ OK | Tests de auth y observabilidad |
-| **test_booking_crm.py** | ✅ OK | Tests de booking y CRM |
-| **test_catalog_leads.py** | ✅ OK | Tests de catálogo y leads |
-| **test_chatwoot.py** | ✅ OK | Tests de Chatwoot |
-| **test_close_directive.py** | ✅ OK | Tests de directivas de cierre |
-| **test_crm.py** | ✅ OK | Tests de CRM |
-| **test_crm_tenant.py** | ✅ OK | Tests de multi-tenant |
-| **test_graph_no_tools_fallback.py** | ✅ OK | Tests de fallback sin tools |
-| **test_jeff.py** | ✅ OK | Tests de Jeff |
-| **test_llm_groq.py** | ✅ OK | Tests de Groq LLM |
-| **test_personas.py** | ✅ OK | Tests de personas |
-| **test_policies_verifier.py** | ✅ OK | Tests de políticas y verificador |
-| **test_rag.py** | ✅ OK | Tests de RAG |
-| **test_salesmind.py** | ✅ OK | Tests de SalesMind |
-| **test_seed_demo.py** | ✅ OK | Tests de seed demo |
-| **test_websearch.py** | ✅ OK | Tests de búsqueda web |
+Todos los límites son **configurables por variable de entorno** (`app/config.py` → `app/limits.py`), no están incrustados en el código.
 
-**Total:** 163 tests ✅
+| Límite | Valor (default) | Variable |
+|--------|-------|-------------------|
+| Mensajes por conversación | 100 | `MAX_MESSAGES_PER_CONVERSATION` |
+| Conversaciones activas por negocio | 1000 | `MAX_ACTIVE_CONVERSATIONS_PER_BUSINESS` |
+| Tokens por conversación | 50,000 | `MAX_TOKENS_PER_CONVERSATION` |
+| Tool calls por turno del agente | 10 | `MAX_TOOL_CALLS_PER_TURN` |
+| Pasos máximos del agente | 20 | `MAX_AGENT_STEPS` |
+| Tokens diarios por negocio | 200,000 | `Business.daily_token_budget` |
+| Requests por IP por minuto | 30 | `RATE_LIMIT_PER_MIN` |
+| Tamaño máximo de mensaje | 2000 chars | Validación Pydantic |
 
 ---
 
-## 6. Configuración
+## 6. Agente y Herramientas
 
-### 6.1. Variables de Entorno
+### 6.1. Herramientas por Plan
+
+| Plan | Herramientas |
+|------|-------------|
+| `free` | `search_products`, `show_plans` |
+| `starter` | + `create_appointment` |
+| `pro` | + `external_search` |
+| `enterprise` | + `crm_sync` |
+
+### 6.2. Controles
+
+| Control | Estado |
+|---------|--------|
+| Herramientas por plan | ✅ `PLAN_TOOLS` dict |
+| Validación de parámetros | ✅ `validate_tool_params()` |
+| Control de acceso | ✅ `check_tool_allowed()` |
+| Auditoría de uso | ✅ `log_tool_usage()` |
+| Límite de tool calls | ✅ `MAX_TOOL_CALLS_PER_TURN` (default 10) en `act()` |
+| Protección contra loops | ✅ `MAX_AGENT_STEPS` (default 20) + corte por tool calls |
+
+---
+
+## 7. Centro de Control Multi-Device
+
+Varios computadores de la misma empresa operan el Centro de Control sobre el **mismo tenant**, con el estado de las conversaciones sincronizado en tiempo real. Si un asesor toma una conversación en una PC, las demás lo ven al instante.
+
+### 7.1. Identidad y autenticación de dispositivos
+
+- Tabla `devices` (migración `e8f2a1b3c4d5`): `business_id + device_id` único, `token_hash` (SHA-256), `status`, `name`, `last_heartbeat`, `last_activity`, `revoked_at`.
+- **Registro:** `POST /api/control-center/devices/register` con `device_id`, `name` y `crm_token`. Devuelve el Bearer token **una sola vez**; en la BD solo vive el hash.
+- **Autenticación:** header `Authorization: Bearer <device_token>` en todos los endpoints de control. Token inválido → 401; dispositivo revocado → 403.
+- El panel guarda el token en `localStorage` y se vuelve a registrar solo si el navegador lo pierde (409 → genera un `device_id` nuevo).
+
+### 7.2. Claim atómico
+
+- `POST /api/control-center/conversations/{id}/claim`
+- **PostgreSQL:** `SELECT … FOR UPDATE` sobre la fila de la conversación dentro de la transacción (dos PCs no pueden leer el mismo estado obsoleto). **SQLite (tests):** sin lock de fila — la validación ocurre a nivel de aplicación; el lock real es el de producción.
+- Éxito → `state=human` + `assigned_to`, `assigned_device_id`, `assigned_at`, `lease_expires_at` y evento `conversation_claimed` por WebSocket.
+- Si otra PC ya la tomó y el lease sigue vigente → **409 `conversation_already_claimed`** con header `X-Assigned-To`.
+- `release` y `close` solo los ejecuta el dispositivo que tomó la conversación (403 para el resto).
+
+### 7.3. Lease y heartbeat
+
+| Mecanismo | Configuración | Default | Función |
+|-----------|---------------|---------|---------|
+| Lease | `DEVICE_LEASE_DURATION_SECONDS` | 300 s | Si expira, cualquier equipo puede reclamar de nuevo: **no hay bloqueos permanentes** si una PC se apaga |
+| Heartbeat | `DEVICE_HEARTBEAT_INTERVAL_SECONDS` | 60 s | `POST /api/control-center/heartbeat` actualiza `last_heartbeat`, visible para el resto |
+
+### 7.4. Tiempo real (WebSocket)
+
+- `WS /api/control-center/ws?token=<device_token>` — un canal por negocio, autenticado con el mismo token de dispositivo.
+- Eventos: `conversation_claimed`, `conversation_released`, `conversation_closed`, `conversation_created`, `conversation_updated`, `message_created`, `device_revoked`.
+- Ping/pong del lado del cliente (`ping` → `pong`).
+- **La BD es la fuente de verdad:** el WebSocket solo notifica; ante cualquier duda el cliente hace resync.
+
+### 7.5. Reconexión y resync
+
+| Paso | Comportamiento |
+|------|----------------|
+| Desconexión | Backoff exponencial 1 s → 2 s → 4 s … tope 30 s |
+| Reconexión | `GET /api/control-center/state` (leads, conversaciones con lease, citas) + refresh de stats |
+| Respaldo | Polling cada 30 s, refresco al volver a la pestaña, heartbeat HTTP cada 60 s |
+| Token caducado/401 | Re-registro automático del dispositivo y reintento único |
+
+### 7.6. Frontend (`frontend/panel.html`)
+
+- Identidad por navegador en `localStorage` (`cc_device_id`, `cc_device_token`, `cc_device_name`).
+- Sección **Conversaciones** con botones *Tomar / Liberar / Cerrar* y badge de quién la tiene y cuándo vence el lease.
+- Indicador en vivo: `En vivo` / `Reconectando…` / `Sin conexión`.
+- Sección **Dispositivos**: equipos registrados del tenant con su último heartbeat.
+- Escape de HTML en toda la salida (XSS) y CSP con `connect-src 'self' ws: wss:`.
+
+### 7.7. Pruebas
+
+25 tests en `tests/test_multidevice.py`: registro, auth (401/403), revocación, claim 200/409, lease expirado, heartbeat, resync de estado, concurrencia con 2 y 3 equipos, aislamiento entre tenants y 5 tests de WebSocket (rechazo sin token, ping/pong, eventos `claim`/`release` en vivo y ausencia de fugas entre tenants).
+
+---
+
+## 8. Tests
+
+### 8.1. Resultados
+
+**`python -m pytest tests/` → 201 passed, 0 failed** (≈7 s, sin dependencias externas).
+
+| Suite | Tests | Estado |
+|-------|-------|--------|
+| `test_jeff.py` | 31 | ✅ |
+| **`test_multidevice.py`** | **25** | ✅ Claim, lease, heartbeat, resync, concurrencia, tenant y WebSocket |
+| `test_auth_obs.py` | 17 | ✅ |
+| `test_policies_verifier.py` | 15 | ✅ |
+| `test_security.py` | 13 | ✅ Headers, rate limit, presupuesto, aislamiento |
+| `test_chatwoot.py` | 13 | ✅ |
+| `test_api.py` | 12 | ✅ Chat, grounding, tenant, cuota |
+| Resto (9 suites) | 75 | ✅ CRM, RAG, personas, catálogo, seeds… |
+| **Total** | **201** | **✅ 0 fallos** |
+
+### 8.2. Aislamiento de tests (corregido)
+
+**Problema original:** al ejecutar la suite completa, `test_api.py` fallaba con `no such table` / `unable to open database file`.
+
+**Causa raíz:** tres módulos instalaban `app.dependency_overrides[get_db]` **al importarse**; al recopilar toda la suite, el último módulo importado pisaba el override de todos los demás y apuntaba a la BD equivocada.
+
+**Solución:** cada módulo instala su override en un fixture `autouse` y lo restaura al terminar (`test_api.py`, `test_multidevice.py`, `test_security.py`). El directorio `/tmp/opencode/` se crea desde `tests/conftest.py`.
+
+**Impacto:** ✅ Solo afectaba al entorno de tests; nunca a producción.
+
+### 8.3. Tests de Seguridad (test_security.py)
+
+| Test | Estado |
+|------|--------|
+| `test_invalid_public_key_returns_401` | ✅ |
+| `test_missing_public_key_returns_401` | ✅ |
+| `test_invalid_crm_token_returns_401` | ✅ |
+| `test_valid_public_key_returns_200` | ✅ |
+| `test_valid_crm_token_returns_200` | ✅ |
+| `test_leads_are_isolated_by_business` | ✅ |
+| `test_rate_limit_logic_works` | ✅ |
+| `test_rate_limit_fails_open_on_db_error` | ✅ |
+| `test_security_headers_present` | ✅ |
+| `test_message_too_long_returns_422` | ✅ |
+| `test_invalid_advisor_returns_null` | ✅ |
+| `test_daily_budget_exceeded_returns_429` | ✅ |
+| `test_cannot_access_other_business_conversation` | ✅ |
+
+---
+
+## 9. Configuración
+
+### 9.1. Variables de Entorno
 
 | Variable | Requerida | Default | Detalle |
 |----------|-----------|---------|---------|
 | `APP_ENV` / `ENVIRONMENT` | ❌ | `dev` | Entorno (dev/prod) |
 | `GROQ_API_KEY` | ✅ (prod) | `""` | API key de Groq |
 | `DATABASE_URL` | ✅ (prod) | `postgresql://agent@127.0.0.1:5433/agent_ventas` | URL de PostgreSQL |
+| `ADMIN_API_KEY` | ✅ (prod) | `""` | Protege onboarding e init-db |
 | `ALLOW_FAKE_LLM` | ❌ | `true` | Permite FakeProvider |
 | `RATE_LIMIT_PER_MIN` | ❌ | `30` | Rate limit por IP |
 | `DAILY_TOKEN_BUDGET` | ❌ | `200000` | Presupuesto diario de tokens |
@@ -234,7 +324,14 @@
 | `EXTERNAL_SEARCH_ENABLED` | ❌ | `true` | Búsqueda externa |
 | `CHATWOOT_URL` | ❌ | `""` | URL de Chatwoot |
 | `CHATWOOT_TOKEN` | ❌ | `""` | Token de Chatwoot |
-| `ALLOWED_ORIGINS` | ❌ | `*` | Orígenes permitidos (CORS) |
+| `ALLOWED_ORIGINS` | ❌ | `*` | Orígenes CORS. **En prod `*` se degrada a same-origin** (lista vacía) |
+| `DEVICE_LEASE_DURATION_SECONDS` | ❌ | `300` | Lease de claim de conversaciones |
+| `DEVICE_HEARTBEAT_INTERVAL_SECONDS` | ❌ | `60` | Heartbeat de dispositivos |
+| `MAX_TOOL_CALLS_PER_TURN` | ❌ | `10` | Tope de tool calls por turno |
+| `MAX_AGENT_STEPS` | ❌ | `20` | Tope de pasos del agente |
+| `MAX_MESSAGES_PER_CONVERSATION` | ❌ | `100` | Mensajes por conversación |
+| `MAX_TOKENS_PER_CONVERSATION` | ❌ | `50000` | Tokens por conversación |
+| `MAX_ACTIVE_CONVERSATIONS_PER_BUSINESS` | ❌ | `1000` | Conversaciones activas por tenant |
 | `LANDING_PUBLIC_KEY` | ❌ | `""` | Clave pública del tenant |
 | `CRM_TOKEN` | ❌ | `""` | Token de operador CRM |
 | `STRIPE_SECRET_KEY` | ❌ | `""` | API key de Stripe |
@@ -243,7 +340,7 @@
 | `TWILIO_AUTH_TOKEN` | ❌ | `""` | Auth token de Twilio |
 | `TWILIO_WHATSAPP_NUMBER` | ❌ | `""` | Número de WhatsApp |
 
-### 6.2. Docker
+### 9.2. Docker
 
 | Archivo | Estado | Detalle |
 |---------|--------|---------|
@@ -253,20 +350,20 @@
 
 ---
 
-## 7. Despliegue
+## 10. Despliegue
 
-### 7.1. Render
+### 10.1. Render
 
 | Componente | Estado | Detalle |
 |------------|--------|---------|
 | **Web Service** | ✅ Live | https://agent-ventas.onrender.com |
-| **PostgreSQL** | ❌ No conecta | Error SSL |
+| **PostgreSQL** | ✅ Conectada | Internal URL (sin SSL) |
 | **Landing** | ✅ OK | https://agent-ventas.onrender.com |
 | **Panel** | ✅ OK | https://agent-ventas.onrender.com/panel |
 | **Onboarding** | ✅ OK | https://agent-ventas.onrender.com/onboarding-page |
-| **API** | ⚠️ Parcial | /health OK, /api/init-db falla |
+| **API** | ✅ OK | Todos los endpoints responden |
 
-### 7.2. Endpoints
+### 10.2. Endpoints
 
 | Endpoint | Método | Estado | Detalle |
 |----------|--------|--------|---------|
@@ -275,85 +372,123 @@
 | `/sales` | GET | ✅ 200 | Sales page |
 | `/onboarding-page` | GET | ✅ 200 | Onboarding page |
 | `/panel` | GET | ✅ 200 | Panel page |
-| `/api/chat` | POST | ⚠️ 500 | Error SSL (BD) |
-| `/api/leads` | POST | ⚠️ 500 | Error SSL (BD) |
-| `/api/onboarding` | POST | ⚠️ 500 | Error SSL (BD) |
-| `/api/init-db` | POST | ⚠️ 500 | Error SSL (BD) |
-| `/api/panel/*` | GET | ⚠️ 500 | Error SSL (BD) |
-| `/api/control-center/*` | GET | ⚠️ 500 | Error SSL (BD) |
-| `/api/whatsapp/*` | POST | ⚠️ 500 | No implementado |
-| `/api/stripe/*` | POST | ⚠️ 500 | No implementado |
+| `/api/chat` | POST | ✅ 200 | Agente AI |
+| `/api/leads` | POST | ✅ 200 | Crear lead |
+| `/api/onboarding` | POST | ✅ 403 | Requiere ADMIN_API_KEY |
+| `/api/init-db` | POST | ✅ 403 | Requiere ADMIN_API_KEY |
+| `/api/panel/*` | GET | ✅ 200 | Dashboard |
+| `/api/control-center/*` | GET | ✅ 200 | Centro de Control (legacy con `?token=`) |
+| `/api/control-center/devices/register` | POST | ✅ 200 | Registra dispositivo → devuelve Bearer token |
+| `/api/control-center/devices` | GET | ✅ 200 | Lista dispositivos del tenant (Bearer) |
+| `/api/control-center/devices/revoke` | POST | ✅ 200 | Revoca un dispositivo (Bearer) |
+| `/api/control-center/heartbeat` | POST | ✅ 200 | Heartbeat del dispositivo (Bearer) |
+| `/api/control-center/state` | GET | ✅ 200 | Resync completo (Bearer) |
+| `/api/control-center/conversations/{id}/claim` | POST | ✅ 200/409 | Claim atómico (Bearer) |
+| `/api/control-center/conversations/{id}/release` | POST | ✅ 200/403 | Libera conversación propia |
+| `/api/control-center/conversations/{id}/close` | POST | ✅ 200 | Cierra conversación |
+| `/api/control-center/ws` | WS | ✅ 101 | Real-time por negocio (token de dispositivo) |
+| `/api/whatsapp/*` | POST | ⚠️ Simulado | Requiere credenciales |
+| `/api/stripe/*` | POST | ⚠️ Simulado | Requiere credenciales |
 
 ---
 
-## 8. Problemas Conocidos
+## 11. Problemas Conocidos
 
-### 8.1. Error SSL con Render PostgreSQL
+### 11.1. Resueltos
 
-**Error:** `SSL connection has been closed unexpectedly`
+| Problema | Estado | Solución |
+|----------|--------|----------|
+| Error SSL con Render PostgreSQL | ✅ Resuelto | Usar Internal URL (sin SSL) |
+| Onboarding sin autenticación | ✅ Resuelto | ADMIN_API_KEY requerido |
+| Init-db sin autenticación | ✅ Resuelto | ADMIN_API_KEY requerido |
+| Sin headers de seguridad | ✅ Resuelto | SecurityHeadersMiddleware |
+| Rate limit test fallando | ✅ Resuelto | Tests unitarios con mocks |
+| CORS `*` en producción | ✅ Resuelto | En prod se degrada a same-origin + `ALLOWED_ORIGINS` explícito |
+| Sin límite de tool calls / loops | ✅ Resuelto | `MAX_TOOL_CALLS_PER_TURN` + `MAX_AGENT_STEPS` |
+| Límites incrustados en código | ✅ Resuelto | Todos por variable de entorno |
+| Suite completa fallaba (aislamiento) | ✅ Resuelto | Overrides de `get_db` por fixture con restauración |
+| Migración no corría en Render | ✅ Resuelto | `startCommand: alembic upgrade head && uvicorn …` |
+| Migración incompatible con SQLite | ✅ Resuelto | `batch_alter_table` para la FK + `sa.func.now()` |
+| Centro de Control solo 1 equipo | ✅ Resuelto | Multi-device: claim, lease, WebSocket, resync |
 
-**Causa:** El contenedor de Docker (`python:3.12-slim`) no tiene los certificados CA del sistema. psycopg2 no puede verificar el certificado de Render PostgreSQL.
+### 11.2. Pendientes (No críticos)
 
-**Solución:** Instalar `ca-certificates` en el Dockerfile (ya hecho, pero el error persiste).
-
-**Estado:** 🔴 No resuelto
-
-### 8.2. WhatsApp no implementado
-
-**Estado:** El endpoint `/api/whatsapp/send` solo simula el envío (print).
-
-**Solución:** Implementar la integración real con Twilio.
-
-### 8.3. Stripe no implementado
-
-**Estado:** El endpoint `/api/stripe/checkout` solo simula la creación de la sesión de checkout.
-
-**Solución:** Implementar la integración real con Stripe.
-
-### 8.4. Webhook de Stripe no verifica firma
-
-**Estado:** El endpoint `/api/stripe/webhook` no verifica la firma de Stripe.
-
-**Solución:** Verificar la firma del webhook con `stripe.Webhook.construct_event`.
-
----
-
-## 9. Recomendaciones
-
-### 9.1. Prioridad Alta (P1)
-
-1. **Resolver error SSL con Render PostgreSQL** — Sin esto, el sistema no funciona.
-2. **Implementar autenticación en onboarding** — Cualquiera puede crear negocios.
-3. **Implementar autenticación en init-db** — Cualquiera puede inicializar la BD.
-4. **Implementar autenticación en WhatsApp send** — Cualquiera puede enviar WhatsApp.
-5. **Implementar autenticación en Stripe checkout** — Cualquiera puede crear checkout.
-6. **Verificar firma de webhook de Stripe** — Webhook sin verificar firma.
-
-### 9.2. Prioridad Media (P2)
-
-1. **Mover token de query param a header** — Tokens en URLs se guardan en logs.
-2. **Configurar CORS correctamente** — `allowed_origins=*` es demasiado permisivo.
-3. **Agregar headers de seguridad** — HSTS, X-Frame-Options, etc.
-4. **Forzar HTTPS** — Los requests pueden hacerse por HTTP.
-
-### 9.3. Prioridad Baja (P3)
-
-1. **Implementar integración real con Twilio** — WhatsApp no está implementado.
-2. **Implementar integración real con Stripe** — Pagos no están implementados.
-3. **Agregar tests de seguridad** — No hay tests para verificar la seguridad.
-4. **Mejorar documentación** — README básico, falta documentación de API.
+| Problema | Impacto | Prioridad |
+|----------|---------|-----------|
+| WhatsApp no implementado | Requiere credenciales Twilio | P2 |
+| Stripe no implementado | Requiere credenciales Stripe | P2 |
+| Token CRM en query param (endpoints legacy) | Logs pueden filtrar tokens; el panel ya usa Bearer | P2 |
+| Docker no se pudo construir en local | Daemon apagado; `docker compose config` OK y arranque verificado con uvicorn | P3 |
+| Bug en get_tool_usage_stats | Estadísticas incorrectas | P3 |
+| Claim sin lock en SQLite | Solo tests/dev; producción usa PostgreSQL con `FOR UPDATE` | P3 |
 
 ---
 
-## 10. Conclusión
+## 12. Instalación del Primer Cliente
 
-El sistema tiene una base sólida: el backend está bien diseñado, el agente AI funciona correctamente, y los tests pasan. Sin embargo, hay problemas críticos que deben resolverse antes de que el sistema pueda ser usado en producción:
+### 12.1. Pasos
 
-1. **Error SSL con Render PostgreSQL** — Sin esto, el sistema no funciona.
-2. **Falta de autenticación** — Varios endpoints críticos no tienen autenticación.
-3. **Integraciones no implementadas** — WhatsApp y Stripe no están implementados.
+1. **Configurar ADMIN_API_KEY en Render**
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+   Agregar en Render dashboard como variable de entorno.
 
-Una vez que se resuelvan estos problemas, el sistema estará listo para ser usado en producción.
+2. **Crear el negocio del cliente**
+   ```bash
+   curl -X POST https://agent-ventas.onrender.com/api/onboarding \
+     -H "Content-Type: application/json" \
+     -H "X-Admin-Api-Key: <ADMIN_API_KEY>" \
+     -d '{
+       "name": "Nombre del Negocio",
+       "email": "cliente@email.com",
+       "phone": "+1234567890",
+       "description": "Descripción del negocio",
+       "catalog": "Catálogo de productos y servicios...",
+       "agent_name": "Sofi"
+     }'
+   ```
+
+3. **Entregar credenciales al cliente**
+   - `public_key`: para el widget de chat
+   - `crm_token`: para el Centro de Control
+
+4. **Configurar el widget**
+   Inyectar `public_key` en `index.html` o usar `?public_key=...` en la URL.
+
+5. **Acceder al Centro de Control**
+   ```
+   https://agent-ventas.onrender.com/panel?token=<CRM_TOKEN>
+   ```
+
+---
+
+## 13. Conclusión
+
+### 13.1. Estado del Sistema
+
+El sistema está **listo para instalar el primer cliente**. Se encontró y corrigió **1 problema crítico** (onboarding desprotegido) y se implementó el **Centro de Control multi-device** completo (identidad de dispositivo, claim atómico, lease/heartbeat, WebSocket, resync). **201 tests pasan, 0 fallos.**
+
+### 13.2. Clasificación de Hallazgos
+
+| Categoría | Cantidad | Detalle |
+|-----------|----------|---------|
+| **Críticos** | 1 (corregido) | Onboarding sin protección |
+| **Importantes** | 4 (corregidos) | Rate limiting fail-open + aislamiento de tests + CORS `*` + migración en Render |
+| **Menores** | 2 | Bug stats + Docker local (daemon apagado) |
+| **Mejoras futuras** | 2 | Sesiones, auditoría de auth |
+
+### 13.3. ¿Puede instalarse el primer cliente?
+
+**✅ SÍ**
+
+El sistema está listo para producción con las siguientes consideraciones:
+
+1. **Configurar ADMIN_API_KEY** antes de exponer públicamente
+2. **WhatsApp y Stripe** requieren credenciales para funcionar (no bloquean la venta)
+3. **La suite completa está en verde:** 201 tests, 0 fallos (incluye concurrencia y WebSocket multi-device)
+4. **El rate limiter** funciona correctamente en producción con PostgreSQL
+5. **Multi-device verificado de punta a punta:** `python scripts/e2e_smoke.py` (8/8) contra un servidor vivo
 
 ---
 

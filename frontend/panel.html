@@ -17,7 +17,7 @@
     .lead-info { font-size: 13px; color: #6b7280; margin: 4px 0; }
     .lead-message { font-size: 13px; color: #374151; background: #f9fafb; padding: 8px; border-radius: 6px; margin: 8px 0; font-style: italic; }
     .lead-appointment { font-size: 13px; color: #059669; margin: 4px 0; }
-    .lead-action { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-top: 8px; }
+    .lead-action { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-top: 8px; border: 0; cursor: pointer; }
     .action-llamar { background: #dbeafe; color: #1d4ed8; }
     .action-confirmar { background: #d1fae5; color: #047857; }
     .action-propuesta { background: #fef3c7; color: #b45309; }
@@ -25,6 +25,39 @@
     .stat-card { background: #f9fafb; padding: 16px; border-radius: 8px; text-align: center; }
     .stat-number { font-size: 28px; font-weight: 700; color: #111827; }
     .stat-label { font-size: 12px; color: #6b7280; margin-top: 4px; }
+
+    /* Multi-device: estado de conexión y conversaciones */
+    .conn-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+      padding: 4px 10px; border-radius: 12px; background: #f3f4f6; color: #374151; }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; }
+    .conn-status.on .conn-dot { background: #10b981; }
+    .conn-status.on { background: #d1fae5; color: #047857; }
+    .conn-status.reconnecting .conn-dot { background: #f59e0b; animation: pulse 1s infinite; }
+    .conn-status.reconnecting { background: #fef3c7; color: #b45309; }
+    .conn-status.off .conn-dot { background: #dc2626; }
+    @keyframes pulse { 50% { opacity: 0.3; } }
+
+    .conv-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px;
+      background: #fff; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .conv-meta { font-size: 13px; color: #6b7280; margin-top: 4px; }
+    .conv-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 12px; }
+    .badge-ai { background: #dbeafe; color: #1d4ed8; }
+    .badge-mine { background: #d1fae5; color: #047857; }
+    .badge-other { background: #fee2e2; color: #dc2626; }
+    .conv-btn { border: 0; border-radius: 6px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-claim { background: #2652b4; color: #fff; }
+    .btn-release { background: #f3f4f6; color: #374151; }
+    .btn-close-conv { background: #fee2e2; color: #dc2626; }
+    .conv-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .device-row { display: flex; justify-content: space-between; font-size: 13px; padding: 8px 0;
+      border-bottom: 1px solid #f3f4f6; }
+    .device-row:last-child { border-bottom: 0; }
+
+    #toast { position: fixed; bottom: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+    .toast-item { background: #111827; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.25); animation: slidein .2s ease; }
+    @keyframes slidein { from { transform: translateY(10px); opacity: 0; } }
   </style>
 </head>
 <body>
@@ -33,8 +66,13 @@
       <a class="brand" href="/panel">Agent Ventas</a>
       <nav class="nav">
         <a href="#dashboard">Dashboard</a>
+        <a href="#conversaciones">Conversaciones</a>
         <a href="#leads">Leads</a>
         <a href="#citas">Citas</a>
+        <a href="#dispositivos">Dispositivos</a>
+        <span class="conn-status off" id="conn-status" title="Estado de sincronización">
+          <span class="conn-dot"></span><span id="conn-text">Conectando…</span>
+        </span>
       </nav>
     </div>
   </header>
@@ -70,6 +108,13 @@
         </div>
       </section>
 
+      <!-- Conversaciones (multi-device: claim / lease) -->
+      <section id="conversaciones" class="seccion">
+        <h2>Conversaciones</h2>
+        <p class="nota">Si otro asesor toma una conversación, aparece aquí al instante.</p>
+        <div id="conv-lista"><p class="nota">Cargando conversaciones…</p></div>
+      </section>
+
       <!-- Leads -->
       <section id="leads" class="seccion">
         <h2>Leads</h2>
@@ -85,37 +130,267 @@
           <p class="nota">Cargando citas...</p>
         </div>
       </section>
+
+      <!-- Dispositivos -->
+      <section id="dispositivos" class="seccion">
+        <h2>Dispositivos conectados</h2>
+        <div id="device-lista"><p class="nota">Cargando dispositivos…</p></div>
+      </section>
     </div>
   </main>
 
-  <script>
-    // Obtener token de la URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const TOKEN = urlParams.get('token');
+  <div id="toast"></div>
 
-    if (!TOKEN) {
-      window.location.href = '/';
+  <script>
+    // ======================================================================
+    // 1. Identidad + autenticación de dispositivo (multi-device)
+    // ======================================================================
+    const urlParams = new URLSearchParams(window.location.search);
+    const CRM_TOKEN = urlParams.get('token');
+    if (!CRM_TOKEN) window.location.href = '/';
+
+    const ID_KEY = 'cc_device_id';
+    const TOKEN_KEY = 'cc_device_token';
+    const NAME_KEY = 'cc_device_name';
+
+    let DEVICE_TOKEN = localStorage.getItem(TOKEN_KEY);
+    let MY_DEVICE_ID = localStorage.getItem(ID_KEY);
+
+    function deviceName() {
+      let n = localStorage.getItem(NAME_KEY);
+      if (!n) {
+        n = 'PC ' + (navigator.platform || 'Web');
+        localStorage.setItem(NAME_KEY, n);
+      }
+      return n;
     }
 
-    // Cargar dashboard
+    function newDeviceId() {
+      const id = 'dev-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
+      localStorage.setItem(ID_KEY, id);
+      return id;
+    }
+
+    // Registra este navegador como dispositivo del negocio.
+    // Devuelve true si quedó autenticado.
+    async function registerDevice(forceNew) {
+      const id = forceNew ? newDeviceId() : (MY_DEVICE_ID || newDeviceId());
+      try {
+        const res = await fetch(
+          '/api/control-center/devices/register?device_id=' + encodeURIComponent(id) +
+          '&name=' + encodeURIComponent(deviceName()) +
+          '&token=' + encodeURIComponent(CRM_TOKEN),
+          { method: 'POST' }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          DEVICE_TOKEN = data.token;
+          MY_DEVICE_ID = data.device_id;
+          localStorage.setItem(TOKEN_KEY, DEVICE_TOKEN);
+          localStorage.setItem(ID_KEY, MY_DEVICE_ID);
+          return true;
+        }
+        if (res.status === 409 && !forceNew) {
+          // El registro previo existe pero perdimos el token (storage limpio):
+          // este navegador pasa a ser un dispositivo nuevo.
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(ID_KEY);
+          return registerDevice(true);
+        }
+        if (res.status === 401) {
+          toast('Token CRM inválido. Revisa la URL del panel.');
+          return false;
+        }
+        return false;
+      } catch (err) {
+        console.error(err);
+        return false;
+      }
+    }
+
+    // Fetch autenticado con Bearer; reintenta 1 vez re-registrando el device.
+    async function api(path, opts = {}, retry = true) {
+      const headers = Object.assign({}, opts.headers || {});
+      if (DEVICE_TOKEN) headers['Authorization'] = 'Bearer ' + DEVICE_TOKEN;
+      const res = await fetch(path, Object.assign({}, opts, { headers }));
+      if ((res.status === 401 || res.status === 403) && retry) {
+        const ok = await registerDevice(true);
+        if (ok) return api(path, opts, false);
+      }
+      return res;
+    }
+
+    // ======================================================================
+    // 2. UI helpers
+    // ======================================================================
+    function toast(msg) {
+      const box = document.getElementById('toast');
+      const el = document.createElement('div');
+      el.className = 'toast-item';
+      el.textContent = msg;
+      box.appendChild(el);
+      setTimeout(() => el.remove(), 5000);
+    }
+
+    function setStatus(mode, text) {
+      const el = document.getElementById('conn-status');
+      el.className = 'conn-status ' + mode;
+      document.getElementById('conn-text').textContent = text;
+    }
+
+    // ======================================================================
+    // 3. Estado (resync) — GET /api/control-center/state
+    // ======================================================================
+    let MY_STATE = { leads: [], conversations: [], appointments: [] };
+
+    async function resync() {
+      try {
+        const res = await api('/api/control-center/state');
+        if (!res.ok) return;
+        MY_STATE = await res.json();
+        renderConversations();
+        renderDevices();
+      } catch (err) { console.error(err); }
+    }
+
+    // ======================================================================
+    // 4. Conversaciones: claim atómico / liberar / cerrar
+    // ======================================================================
+    function renderConversations() {
+      const box = document.getElementById('conv-lista');
+      const convs = (MY_STATE.conversations || []).slice().reverse();
+      if (convs.length === 0) {
+        box.innerHTML = '<p class="nota">No hay conversaciones todavía.</p>';
+        return;
+      }
+      const now = Date.now();
+      box.innerHTML = convs.map(c => {
+        const expired = !!c.lease_expired;
+        const mine = !!c.assigned_to && !expired &&
+          (c.assigned_to === deviceName() || c.assigned_to === MY_DEVICE_ID);
+        const takenOther = !!c.assigned_to && !expired && !mine;
+        const lease = c.lease_expires_at && !expired
+          ? ' · lease vence ' + new Date(c.lease_expires_at).toLocaleTimeString('es')
+          : '';
+
+        let badge, actions;
+        if (c.state === 'closed') {
+          badge = '<span class="conv-badge badge-other">Cerrada</span>';
+          actions = '';
+        } else if (takenOther) {
+          badge = '<span class="conv-badge badge-other">👤 ' + escapeHtml(c.assigned_to) + ' (tomada)</span>';
+          actions = '<button class="conv-btn btn-claim" disabled>Tomada</button>';
+        } else if (mine) {
+          badge = '<span class="conv-badge badge-mine">✅ En tu mano</span>';
+          actions =
+            '<button class="conv-btn btn-release" data-act="release" data-id="' + c.id + '">Liberar</button> ' +
+            '<button class="conv-btn btn-close-conv" data-act="close" data-id="' + c.id + '">Cerrar</button>';
+        } else {
+          // libre o lease expirado → se puede tomar
+          badge = '<span class="conv-badge badge-ai">🤖 IA (disponible)</span>';
+          actions = '<button class="conv-btn btn-claim" data-act="claim" data-id="' + c.id + '">Tomar</button>';
+        }
+
+        return `
+          <div class="conv-card">
+            <div>
+              <strong>Conversación #${c.id}</strong>
+              <div class="conv-meta">Canal: ${escapeHtml(c.channel || 'web')} · Estado: ${escapeHtml(c.state)}${lease}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              ${badge}${actions}
+            </div>
+          </div>`;
+      }).join('');
+
+      box.querySelectorAll('button[data-act]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = parseInt(btn.dataset.id, 10);
+          if (btn.dataset.act === 'claim') claimConv(id);
+          if (btn.dataset.act === 'release') releaseConv(id);
+          if (btn.dataset.act === 'close') closeConv(id);
+        });
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, m =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    // Claim atómico en el servidor: 200 = tuya, 409 = otro asesor ya la tomó.
+    async function claimConv(id) {
+      const res = await api('/api/control-center/conversations/' + id + '/claim', { method: 'POST' });
+      if (res.status === 409) {
+        toast('⚠️ Otro asesor tomó la conversación #' + id + ' primero.');
+      } else if (res.ok) {
+        toast('✅ Conversación #' + id + ' tomada por este dispositivo.');
+      } else if (res.status === 404) {
+        toast('La conversación ya no existe.');
+      } else {
+        toast('Error al tomar la conversación (' + res.status + ').');
+      }
+      await resync();
+    }
+
+    async function releaseConv(id) {
+      const res = await api('/api/control-center/conversations/' + id + '/release', { method: 'POST' });
+      if (res.ok) toast('Conversación #' + id + ' liberada.');
+      else if (res.status === 403) toast('Solo el dispositivo que la tomó puede liberarla.');
+      await resync();
+    }
+
+    async function closeConv(id) {
+      const res = await api('/api/control-center/conversations/' + id + '/close', { method: 'POST' });
+      if (res.ok) toast('Conversación #' + id + ' cerrada.');
+      await resync();
+    }
+
+    // ======================================================================
+    // 5. Dispositivos del negocio
+    // ======================================================================
+    async function renderDevices() {
+      try {
+        const res = await api('/api/control-center/devices');
+        if (!res.ok) return;
+        const devices = await res.json();
+        const box = document.getElementById('device-lista');
+        if (devices.length === 0) {
+          box.innerHTML = '<p class="nota">No hay dispositivos registrados.</p>';
+          return;
+        }
+        box.innerHTML = devices.map(d => {
+          const isMe = d.device_id === MY_DEVICE_ID;
+          const hb = d.last_heartbeat ? new Date(d.last_heartbeat).toLocaleTimeString('es') : '—';
+          const status = d.status === 'active'
+            ? (isMe ? '🟢 este equipo' : '🟢 activo')
+            : '🔴 revocado';
+          return `<div class="device-row">
+            <span>${escapeHtml(d.name || d.device_id)}${isMe ? ' <strong>(tú)</strong>' : ''}</span>
+            <span>${status} · último heartbeat: ${hb}</span>
+          </div>`;
+        }).join('');
+      } catch (err) { console.error(err); }
+    }
+
+    // ======================================================================
+    // 6. Dashboard / leads / citas (endpoints legacy con CRM token)
+    // ======================================================================
     async function cargarDashboard() {
       try {
-        const res = await fetch('/api/control-center/stats?token=' + TOKEN);
+        const res = await fetch('/api/control-center/stats?token=' + encodeURIComponent(CRM_TOKEN));
         const data = await res.json();
         document.getElementById('stat-total').textContent = data.total_leads || 0;
         document.getElementById('stat-hoy').textContent = data.leads_hoy || 0;
         document.getElementById('stat-calientes').textContent = data.leads_calientes || 0;
         document.getElementById('stat-citas').textContent = data.citas_pendientes || 0;
         document.getElementById('stat-activas').textContent = data.conversaciones_activas || 0;
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
     }
 
-    // Cargar leads
     async function cargarLeads() {
       try {
-        const res = await fetch('/api/control-center/leads?token=' + TOKEN);
+        const res = await fetch('/api/control-center/leads?token=' + encodeURIComponent(CRM_TOKEN));
         const leads = await res.json();
         const lista = document.getElementById('leads-lista');
 
@@ -141,35 +416,32 @@
             <div class="lead-card">
               <div class="lead-header">
                 <div>
-                  <p class="lead-name">${l.name || 'Sin nombre'}</p>
+                  <p class="lead-name">${escapeHtml(l.name || 'Sin nombre')}</p>
                   <div class="lead-info">
-                    ${l.company ? `<span>🏢 ${l.company}</span>` : ''}
-                    ${l.email ? `<span>✉️ ${l.email}</span>` : ''}
-                    ${l.phone ? `<span>📱 ${l.phone}</span>` : ''}
-                    <span>Canal: ${l.channel}</span>
+                    ${l.company ? `<span>🏢 ${escapeHtml(l.company)}</span>` : ''}
+                    ${l.email ? `<span>✉️ ${escapeHtml(l.email)}</span>` : ''}
+                    ${l.phone ? `<span>📱 ${escapeHtml(l.phone)}</span>` : ''}
+                    <span>Canal: ${escapeHtml(l.channel)}</span>
                   </div>
                 </div>
                 <span class="temp-badge ${tempClass}">${l.temperature} ${l.temperature_raw}</span>
               </div>
-              ${l.need ? `<div class="lead-info">💡 Necesidad: ${l.need}</div>` : ''}
-              ${l.budget ? `<div class="lead-info">💰 Presupuesto: ${l.budget}</div>` : ''}
-              ${l.urgency ? `<div class="lead-info">⏰ Urgencia: ${l.urgency}</div>` : ''}
-              ${l.last_message ? `<div class="lead-message">"${l.last_message}"</div>` : ''}
+              ${l.need ? `<div class="lead-info">💡 Necesidad: ${escapeHtml(l.need)}</div>` : ''}
+              ${l.budget ? `<div class="lead-info">💰 Presupuesto: ${escapeHtml(l.budget)}</div>` : ''}
+              ${l.urgency ? `<div class="lead-info">⏰ Urgencia: ${escapeHtml(l.urgency)}</div>` : ''}
+              ${l.last_message ? `<div class="lead-message">"${escapeHtml(l.last_message)}"</div>` : ''}
               ${apptHtml}
-              ${l.ai_summary ? `<div class="lead-info">🤖 Resumen IA: ${l.ai_summary}</div>` : ''}
+              ${l.ai_summary ? `<div class="lead-info">🤖 Resumen IA: ${escapeHtml(l.ai_summary)}</div>` : ''}
               <span class="lead-action ${actionClass}">${actionText}</span>
             </div>
           `;
         }).join('');
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
     }
 
-    // Cargar citas
     async function cargarCitas() {
       try {
-        const res = await fetch('/api/panel/appointments?token=' + TOKEN);
+        const res = await fetch('/api/panel/appointments?token=' + encodeURIComponent(CRM_TOKEN));
         const citas = await res.json();
         const lista = document.getElementById('citas-lista');
 
@@ -182,34 +454,131 @@
           <div class="lead-card">
             <div class="lead-header">
               <div>
-                <p class="lead-name">${c.customer_name || 'Sin nombre'}</p>
+                <p class="lead-name">${escapeHtml(c.customer_name || 'Sin nombre')}</p>
                 <div class="lead-info">
-                  ${c.contact ? `<span>📱 ${c.contact}</span>` : ''}
-                  ${c.company ? `<span>🏢 ${c.company}</span>` : ''}
+                  ${c.contact ? `<span>📱 ${escapeHtml(c.contact)}</span>` : ''}
+                  ${c.company ? `<span>🏢 ${escapeHtml(c.company)}</span>` : ''}
                 </div>
               </div>
               <span class="temp-badge temp-caliente">📅 ${new Date(c.start).toLocaleString('es')}</span>
             </div>
-            ${c.need ? `<div class="lead-info">💡 Necesidad: ${c.need}</div>` : ''}
-            ${c.context ? `<div class="lead-message">"${c.context}"</div>` : ''}
+            ${c.need ? `<div class="lead-info">💡 Necesidad: ${escapeHtml(c.need)}</div>` : ''}
+            ${c.context ? `<div class="lead-message">"${escapeHtml(c.context)}"</div>` : ''}
           </div>
         `).join('');
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
     }
 
-    // Cargar todo
-    cargarDashboard();
-    cargarLeads();
-    cargarCitas();
-
-    // Refrescar cada 30 segundos
-    setInterval(() => {
+    function refreshAll() {
       cargarDashboard();
       cargarLeads();
       cargarCitas();
-    }, 30000);
+      resync();
+    }
+
+    // ======================================================================
+    // 7. WebSocket real-time + reconexión con backoff exponencial
+    // ======================================================================
+    let ws = null;
+    let wsAttempts = 0;
+    let reconnectTimer = null;
+    let heartbeatTimer = null;
+
+    function wsUrl() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return proto + '//' + location.host + '/api/control-center/ws?token=' + encodeURIComponent(DEVICE_TOKEN);
+    }
+
+    function connectWS() {
+      if (!DEVICE_TOKEN) return;
+      try { ws = new WebSocket(wsUrl()); } catch (e) { scheduleReconnect(); return; }
+
+      ws.onopen = () => {
+        wsAttempts = 0;
+        setStatus('on', 'En vivo');
+        // Resync inmediato: por si perdimos eventos durante la desconexión.
+        refreshAll();
+      };
+
+      ws.onmessage = (ev) => handleEvent(ev.data);
+
+      ws.onclose = () => {
+        setStatus('reconnecting', 'Reconectando…');
+        scheduleReconnect();
+      };
+
+      ws.onerror = () => { try { ws.close(); } catch (e) {} };
+    }
+
+    function scheduleReconnect() {
+      wsAttempts++;
+      const delay = Math.min(30000, 1000 * Math.pow(2, wsAttempts - 1)); // 1s, 2s, 4s … 30s
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(connectWS, delay);
+      setStatus('reconnecting', 'Reconectando… (' + Math.round(delay / 1000) + 's)');
+    }
+
+    function handleEvent(raw) {
+      if (raw === 'pong') return;
+      let ev;
+      try { ev = JSON.parse(raw); } catch (e) { return; }
+
+      switch (ev.type) {
+        case 'conversation_claimed':
+          if (ev.data.assigned_device_id !== undefined && ev.data.assigned_to) {
+            toast('👤 ' + ev.data.assigned_to + ' tomó la conversación #' + ev.data.conversation_id);
+          }
+          break;
+        case 'conversation_released':
+          toast('Conversación #' + ev.data.conversation_id + ' liberada.');
+          break;
+        case 'conversation_closed':
+          toast('Conversación #' + ev.data.conversation_id + ' cerrada.');
+          break;
+        case 'conversation_created':
+        case 'conversation_updated':
+        case 'message_created':
+          break;
+        case 'device_revoked':
+          toast('🔴 Un dispositivo fue revocado.');
+          break;
+        default:
+          break;
+      }
+      // Cualquier evento → refresco inmediato (la BD es la fuente de verdad).
+      refreshAll();
+    }
+
+    // Heartbeat: HTTP (para que otros dispositivos vean tu presencia) + WS ping.
+    async function sendHeartbeat() {
+      try { await api('/api/control-center/heartbeat', { method: 'POST' }); } catch (e) {}
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try { ws.send('ping'); } catch (e) {}
+      }
+    }
+
+    // ======================================================================
+    // 8. Arranque
+    // ======================================================================
+    (async function init() {
+      setStatus('off', 'Autenticando…');
+      const ok = DEVICE_TOKEN ? true : await registerDevice(false);
+      if (!ok) { setStatus('off', 'Sin conexión'); return; }
+
+      refreshAll();
+      connectWS();
+
+      // Heartbeat cada 60s (configurable vía DEVICE_HEARTBEAT_INTERVAL)
+      heartbeatTimer = setInterval(sendHeartbeat, 60000);
+
+      // Polling de respaldo cada 30s por si el WebSocket vive en un proxy lento.
+      setInterval(refreshAll, 30000);
+
+      // Refrescar al volver a la pestaña.
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshAll();
+      });
+    })();
   </script>
 </body>
 </html>

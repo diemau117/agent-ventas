@@ -7,12 +7,19 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Migraciones antes de arrancar: crea la tabla devices y las columnas de claim.
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: APP_ENV
         value: prod
       - key: SECRET_KEY
         generateValue: true
+      # API key para endpoints admin (/api/onboarding). Visible en el dashboard de Render.
+      - key: ADMIN_API_KEY
+        generateValue: true
+      # CORS explícito (nunca "*"): solo el propio dominio.
+      - key: ALLOWED_ORIGINS
+        value: https://agent-ventas.onrender.com
       - key: DATABASE_URL
         fromDatabase:
           name: agent-ventas-db

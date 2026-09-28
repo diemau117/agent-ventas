@@ -56,6 +56,23 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_whatsapp_number: str = ""
 
+    # Admin API Key — protege endpoints administrativos (/api/onboarding, /api/init-db)
+    # Sin esta key, esos endpoints devuelven 403. En producción es obligatoria.
+    admin_api_key: str = ""
+
+    # Device lease/heartbeat (multi-device Control Center)
+    device_lease_duration_seconds: int = 300  # 5 minutos
+    device_heartbeat_interval_seconds: int = 60  # 1 minuto
+
+    # Agent hard limits — previenen loops infinitos
+    max_tool_calls_per_turn: int = 10
+    max_agent_steps: int = 20
+
+    # Message limit por conversación (backend-controlled)
+    max_messages_per_conversation: int = 100
+    max_tokens_per_conversation: int = 50000
+    max_active_conversations_per_business: int = 1000
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @field_validator("app_env")

@@ -181,11 +181,23 @@ def build_graph(llm: LLMProvider, db: Session):
         payload: dict = {"next_step": "DISCOVER", "reason": "default"}
         handoff = False
         handoff_reason = ""
+        # Hard limits: contadores para prevenir loops infinitos
+        tool_call_count = 0
+        max_tool_calls = settings.max_tool_calls_per_turn
+        max_steps = settings.max_agent_steps
+        step_count = 0
         if use_tools:
             first = await llm.chat(messages, tools=TOOL_DEFS)
             for k in usage:
                 usage[k] += first.usage.get(k, 0)
             for call in first.tool_calls:
+                # Hard limit: MAX_TOOL_CALLS_PER_TURN
+                if tool_call_count >= max_tool_calls:
+                    break
+                tool_call_count += 1
+                step_count += 1
+                if step_count > max_steps:
+                    break
                 tool_results[call.name] = execute_tool(
                     db, state["business_id"], state["conversation_id"], call.name, call.args
                 )

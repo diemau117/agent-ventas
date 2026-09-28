@@ -165,6 +165,14 @@ class Conversation(Base):
     summary: Mapped[str] = mapped_column(Text, default="")
     handoff_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     handoff_reason: Mapped[str] = mapped_column(String(200), default="")
+    # Multi-device claim: assigned_to (user name), assigned_device_id, assigned_at
+    assigned_to: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    assigned_device_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devices.id"), nullable=True, index=True
+    )
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Lease expiration: if assigned and lease_expires_at < now, conversation is available again
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     created: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -300,3 +308,36 @@ class ExternalSearch(Base):
     results: Mapped[list] = mapped_column(JSONType, default=list)
     answer_used: Mapped[bool] = mapped_column(Boolean, default=False)
     created: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Device(Base):
+    """Dispositivo (computador) registrado para un negocio.
+
+    Cada instalación del Centro de Control en un computador tiene su propio
+    device_id. Múltiples dispositivos pueden pertenecer al mismo negocio
+    (multi-device). Un dispositivo revocado no puede continuar accediendo.
+    """
+
+    __tablename__ = "devices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id"), index=True)
+    # device_id único por negocio (no global): permite que dos negocios tengan
+    # un "device-1" sin colisionar.
+    device_id: Mapped[str] = mapped_column(String(64), index=True)
+    # Token de autenticación del dispositivo (Bearer). Se hashea en la BD.
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    # Estado: active | revoked
+    status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    # Nombre descriptivo del dispositivo (opcional, para el admin)
+    name: Mapped[str] = mapped_column(String(100), default="")
+    # Última vez que el dispositivo envió heartbeat
+    last_heartbeat: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Última actividad registrada (claim, release, heartbeat, etc.)
+    last_activity: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("business_id", "device_id", name="uq_business_device"),
+    )

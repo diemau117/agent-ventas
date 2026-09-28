@@ -1,18 +1,27 @@
 """Onboarding — Crea un negocio nuevo con su token de acceso."""
 import secrets
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
+from app.config import settings
 from app.db.database import get_db, init_db
 from app.db.models import Business, Knowledge
 
 router = APIRouter()
 
 
+def require_admin(x_admin_api_key: str = Header(None)) -> None:
+    """Protege endpoints administrativos. Requiere ADMIN_API_KEY en config."""
+    if not settings.admin_api_key:
+        raise HTTPException(status_code=403, detail="admin_api_key_not_configured")
+    if x_admin_api_key != settings.admin_api_key:
+        raise HTTPException(status_code=403, detail="invalid_admin_api_key")
+
+
 @router.post("/init-db")
-async def initialize_database():
-    """Inicializa las tablas en la base de datos."""
+async def initialize_database(_=Depends(require_admin)):
+    """Inicializa las tablas en la base de datos. Requiere admin_api_key."""
     try:
         init_db()
         return {"message": "Base de datos inicializada exitosamente"}
@@ -30,8 +39,15 @@ class OnboardingRequest(BaseModel):
 
 
 @router.post("/onboarding")
-async def create_business(data: OnboardingRequest, db: Session = Depends(get_db)):
-    """Crea un negocio nuevo y devuelve su token de acceso al panel."""
+async def create_business(
+    data: OnboardingRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Crea un negocio nuevo y devuelve su token de acceso al panel.
+
+    Requiere admin_api_key en header X-Admin-Api-Key.
+    """
     
     # Verificar si ya existe un negocio con ese email
     existing = db.query(Business).filter(Business.name == data.name).first()

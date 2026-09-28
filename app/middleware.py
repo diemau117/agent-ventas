@@ -138,8 +138,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Referrer policy
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         
-        # Content Security Policy (básica)
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+        # Content Security Policy (básica). connect-src explícito: el panel
+        # usa WebSocket (wss) y fetch a la misma origen para el real-time.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "connect-src 'self' ws: wss:;"
+        )
         
         # HSTS (solo en producción)
         if settings.is_prod:
@@ -150,10 +155,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 def install_middlewares(app: FastAPI) -> None:
     """CORS + rate limit persistente + headers de seguridad. Lo llama el orquestador desde main.py."""
-    origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+    raw_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+
+    # En producción, CORS=* es un riesgo de seguridad. Si no se configuran
+    # orígenes específicos, se restringe a orígenes vacíos (solo same-origin).
+    if settings.is_prod and (not raw_origins or raw_origins == ["*"]):
+        raw_origins = []
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=raw_origins,
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
         allow_credentials=False,

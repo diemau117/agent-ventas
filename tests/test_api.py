@@ -1,6 +1,9 @@
 """Integración con SQLite + FakeProvider: grounding, tenant, lead, injection."""
 import asyncio
+import os
+import tempfile
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -11,11 +14,17 @@ from app.db.models import Base, Business, Conversation, Customer, Message, Produ
 from app.llm.base import FakeProvider
 from app.main import app
 
-engine = create_engine("sqlite:////tmp/opencode/agent_test.db", connect_args={"check_same_thread": False})
+# Crear directorio temporal si no existe
+os.makedirs("/tmp/opencode", exist_ok=True)
+# Usar un archivo de BD único para este módulo de tests
+db_path = "/tmp/opencode/agent_test_api.db"
+engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
 Test = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 def _seed():
+    # No eliminar el archivo de BD (el engine ya tiene una conexión abierta)
+    # Simplemente recrear las tablas
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     db = Test()
@@ -31,6 +40,8 @@ def _seed():
 
 
 BIZ_A, BIZ_B, KEY_A, KEY_B = _seed()
+
+
 def _override_db():
     db = Test()
     try:
@@ -39,7 +50,20 @@ def _override_db():
         db.close()
 
 
-app.dependency_overrides[get_db] = _override_db
+@pytest.fixture(autouse=True)
+def reset_db():
+    """Resetea la BD, instala el override de get_db y lo restaura al final."""
+    global BIZ_A, BIZ_B, KEY_A, KEY_B
+    prev = app.dependency_overrides.get(get_db)
+    app.dependency_overrides[get_db] = _override_db
+    BIZ_A, BIZ_B, KEY_A, KEY_B = _seed()
+    yield
+    if prev is None:
+        app.dependency_overrides.pop(get_db, None)
+    else:
+        app.dependency_overrides[get_db] = prev
+
+
 chat_route._llm = FakeProvider()
 client = TestClient(app)
 

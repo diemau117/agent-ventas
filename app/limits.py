@@ -18,7 +18,7 @@ from app.db.models import Business, Conversation, Message
 
 def check_message_limit(db: Session, conversation_id: int) -> None:
     """Verifica que la conversación no exceda el límite de mensajes."""
-    max_messages = 100  # Límite por conversación
+    max_messages = settings.max_messages_per_conversation
     count = db.query(Message).filter(Message.conversation_id == conversation_id).count()
     if count >= max_messages:
         raise HTTPException(
@@ -30,7 +30,7 @@ def check_message_limit(db: Session, conversation_id: int) -> None:
 
 def check_conversation_limit(db: Session, business_id: int) -> None:
     """Verifica que el negocio no exceda el límite de conversaciones activas."""
-    max_conversations = 1000  # Límite por negocio
+    max_conversations = settings.max_active_conversations_per_business
     count = db.query(Conversation).filter(
         Conversation.business_id == business_id,
         Conversation.state == "ai",
@@ -45,7 +45,7 @@ def check_conversation_limit(db: Session, business_id: int) -> None:
 
 def check_token_limit(db: Session, conversation_id: int) -> None:
     """Verifica que la conversación no exceda el límite de tokens."""
-    max_tokens = 50000  # Límite por conversación
+    max_tokens = settings.max_tokens_per_conversation
     used = (
         db.query(func.coalesce(func.sum(Message.tokens_in + Message.tokens_out), 0))
         .filter(Message.conversation_id == conversation_id)

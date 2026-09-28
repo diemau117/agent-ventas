@@ -38,7 +38,7 @@ def upgrade() -> None:
     sa.Column('chatwoot_token', sa.String(length=200), nullable=False),
     sa.Column('chatwoot_inbox_id', sa.Integer(), nullable=False),
     sa.Column('external_search_enabled', sa.Boolean(), nullable=False),
-    sa.Column('created', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created', sa.DateTime(), server_default=sa.func.now(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('businesses', schema=None) as batch_op:
@@ -60,7 +60,7 @@ def upgrade() -> None:
     sa.Column('latency_ms', sa.Integer(), nullable=False),
     sa.Column('level', sa.String(length=10), nullable=False),
     sa.Column('message', sa.Text(), nullable=False),
-    sa.Column('created', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created', sa.DateTime(), server_default=sa.func.now(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('event_logs', schema=None) as batch_op:
@@ -77,7 +77,7 @@ def upgrade() -> None:
     sa.Column('query', sa.String(length=500), nullable=False),
     sa.Column('results', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=False),
     sa.Column('answer_used', sa.Boolean(), nullable=False),
-    sa.Column('created', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created', sa.DateTime(), server_default=sa.func.now(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('external_searches', schema=None) as batch_op:
@@ -103,7 +103,7 @@ def upgrade() -> None:
     sa.Column('company', sa.String(length=200), nullable=False),
     sa.Column('advisor_name', sa.String(length=100), nullable=False),
     sa.Column('facts', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=False),
-    sa.Column('created', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created', sa.DateTime(), server_default=sa.func.now(), nullable=False),
     sa.ForeignKeyConstraint(['business_id'], ['businesses.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -119,8 +119,8 @@ def upgrade() -> None:
     sa.Column('content', sa.Text(), nullable=False),
     sa.Column('keywords', sa.Text(), nullable=False),
     sa.Column('active', sa.Boolean(), nullable=False),
-    sa.Column('created', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created', sa.DateTime(), server_default=sa.func.now(), nullable=False),
+    sa.Column('updated', sa.DateTime(), server_default=sa.func.now(), nullable=False),
     sa.ForeignKeyConstraint(['business_id'], ['businesses.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -155,7 +155,7 @@ def upgrade() -> None:
     sa.Column('summary', sa.Text(), nullable=False),
     sa.Column('handoff_at', sa.DateTime(), nullable=True),
     sa.Column('handoff_reason', sa.String(length=200), nullable=False),
-    sa.Column('created', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created', sa.DateTime(), server_default=sa.func.now(), nullable=False),
     sa.ForeignKeyConstraint(['business_id'], ['businesses.id'], ),
     sa.ForeignKeyConstraint(['customer_id'], ['customers.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -204,8 +204,8 @@ def upgrade() -> None:
     sa.Column('next_action', sa.String(length=300), nullable=False),
     sa.Column('ai_summary', sa.Text(), nullable=False),
     sa.Column('last_interaction', sa.DateTime(), nullable=True),
-    sa.Column('created', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created', sa.DateTime(), server_default=sa.func.now(), nullable=False),
+    sa.Column('updated', sa.DateTime(), server_default=sa.func.now(), nullable=False),
     sa.ForeignKeyConstraint(['business_id'], ['businesses.id'], ),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ),
     sa.ForeignKeyConstraint(['customer_id'], ['customers.id'], ),
@@ -226,7 +226,7 @@ def upgrade() -> None:
     sa.Column('tokens_in', sa.Integer(), nullable=False),
     sa.Column('tokens_out', sa.Integer(), nullable=False),
     sa.Column('cost_est', sa.Float(), nullable=False),
-    sa.Column('created', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created', sa.DateTime(), server_default=sa.func.now(), nullable=False),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
