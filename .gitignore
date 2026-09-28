@@ -8,3 +8,4 @@ deploy/.last_tunnel_url
 *.sqlite
 *.sqlite3
 backups/
+.render_token
