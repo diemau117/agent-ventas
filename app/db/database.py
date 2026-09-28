@@ -21,6 +21,7 @@ def get_engine():
     # que en la URL (evita "SSL connection has been closed unexpectedly")
     if "sslmode" not in url:
         connect_args["sslmode"] = "verify-ca"
+        connect_args["sslrootcert"] = "system"
     return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
 
