@@ -4,10 +4,20 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
-from app.db.database import get_db
+from app.db.database import get_db, init_db
 from app.db.models import Business, Knowledge
 
 router = APIRouter()
+
+
+@router.post("/init-db")
+async def initialize_database():
+    """Inicializa las tablas en la base de datos."""
+    try:
+        init_db()
+        return {"message": "Base de datos inicializada exitosamente"}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 class OnboardingRequest(BaseModel):
