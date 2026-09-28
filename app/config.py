@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     app_env: str = Field(default="dev", validation_alias=AliasChoices("APP_ENV", "ENVIRONMENT"))
     groq_api_key: str = ""
     llm_model: str = "openai/gpt-oss-20b"
-    database_url: str = "postgresql+psycopg2://agent@127.0.0.1:5433/agent_ventas"
+    database_url: str = "postgresql://agent@127.0.0.1:5433/agent_ventas"
     max_history: int = 8
 
     # Rate limit y presupuesto (spec §21).
@@ -75,15 +75,13 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _db_url(cls, v: str) -> str:
-        """Fuerza psycopg2 y SSL para Render PostgreSQL.
+        """Agrega sslmode=require para Render PostgreSQL.
 
         Render PostgreSQL REQUIERE SSL (FATAL: SSL/TLS required si no).
-        sslmode=require activa la conexión SSL correctamente.
+        psycopg (v3) maneja el handshake SSL correctamente.
         """
-        if v and v.startswith("postgresql://"):
-            v = v.replace("postgresql://", "postgresql+psycopg2://", 1)
         if v and "sslmode" not in v:
-            v = v + "?sslmode=disable"
+            v = v + "?sslmode=require"
         return v
 
     @property
