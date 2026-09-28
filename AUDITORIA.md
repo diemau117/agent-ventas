@@ -497,7 +497,18 @@ El sistema está **listo para instalar el primer cliente**. Se encontró y corri
 | **Menores** | 2 | Bug stats + Docker local (daemon apagado) |
 | **Mejoras futuras** | 2 | Sesiones, auditoría de auth |
 
-### 13.3. ¿Puede instalarse el primer cliente?
+### 13.3. Estado del proyecto
+
+| Área | Estado | Nota |
+|------|--------|------|
+| **Core técnico** | 🟢 ~90–95% para primer cliente | 218 tests, E2E 10/10, capacidad medida |
+| **Producto comercial** | 🟡 Falta cerrar la experiencia de venta | Landing: CAOS → AGENTE → PRECALIFICACIÓN → HOT LEAD → CENTRO DE CONTROL → ASESOR + "Pruébalo" |
+| **Infraestructura** | 🟢 Lista para demo y piloto | Render Free sirve para demostrar; **subir de plan con el primer cliente que paga** (el límite es el cold start, no la app) |
+
+No se añaden más módulos de infraestructura (ni Redis, ni múltiples instancias,
+ni microservicios) hasta que haya un cliente real usándolo.
+
+### 13.4. ¿Puede instalarse el primer cliente?
 
 **✅ SÍ**
 

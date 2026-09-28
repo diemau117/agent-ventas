@@ -201,6 +201,12 @@ python scripts/ws_debug.py <CRM_TOKEN> 50   # 50 paneles abiertos
 python scripts/load_test.py <CRM_TOKEN> 20 200   # carga HTTP + fan-out
 ```
 
+> **Lo que se puede decir (y lo que no).** Medido y defendible:
+> *"probado con 50 paneles WebSocket simultáneos y 40 usuarios concurrentes,
+> cero errores"*. **No está medido** por encima de esas cifras: no afirmar
+> "cientos" ni "miles" en una conversación comercial. Si un cliente pide más,
+> se vuelve a correr `load_test.py` con los números nuevos.
+
 **Regresión protegida en tests:** `test_many_connections_same_device_do_not_stall_server`
 abre 18 conexiones (más que el pool de 15) y exige que el servidor siga vivo; si
 alguien vuelve a retener sesiones en los WebSockets, el test falla.
