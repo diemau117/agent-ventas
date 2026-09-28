@@ -1,10 +1,10 @@
 # Pruebas manuales previas a la venta
 
-Checklist operativo. Los tests automatizados (216) cubren la lógica; esto cubre
+Checklist operativo. Los tests automatizados (221) cubren la lógica; esto cubre
 **el mundo real**: dos computadoras físicas, caídas, ataques y consumo.
 
 Automatizado de fábrica:
-- `python -m pytest tests/` → 216 passed
+- `python -m pytest tests/` → 221 passed
 - `python scripts/e2e_smoke.py <conversation_id> <crm_token>` → 10/10
 - `python scripts/bench.py <crm_token> [public_key]` → latencias p50/p95
 

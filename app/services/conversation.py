@@ -1,4 +1,6 @@
 """Orquesta el grafo, persiste la charla y arma tarjetas interactivas."""
+import logging
+
 from sqlalchemy.orm import Session
 
 from app.agent.graph import build_graph
@@ -10,6 +12,23 @@ from app.limits import check_business_limits, check_conversation_limits
 from app.llm.base import LLMProvider
 from app.observability import log_event
 from app.services.customer import ensure_customer, profile_text
+
+
+log = logging.getLogger("conversation")
+
+
+async def _notify(business_id: int, event: str, data: dict) -> None:
+    """Avisa a los paneles abiertos (Centro de Control) de un cambio.
+
+    Best-effort: el realtime NUNCA puede romper el chat. Si no hay paneles
+    conectados o el broadcast falla, la respuesta al cliente sale igual.
+    """
+    try:
+        from app.realtime import broadcast_event
+
+        await broadcast_event(business_id, event, data)
+    except Exception as e:  # pragma: no cover - red/proceso caído
+        log.debug("broadcast %s no entregado: %s", event, e)
 
 
 def _price_label(p: dict) -> str:
@@ -66,6 +85,12 @@ async def run_chat(
         db.add(conv)
         db.commit()
         db.refresh(conv)
+        # El panel debe ver la conversación EN CUANTO nace, no a los 30 s.
+        await _notify(business_id, "conversation_created", {
+            "conversation_id": conv.id,
+            "channel": conv.channel,
+            "state": conv.state,
+        })
     rows = (
         db.query(Message)
         .filter_by(conversation_id=conv.id)
@@ -110,6 +135,11 @@ async def run_chat(
         )
     )
     db.commit()
+    if not greeting:
+        await _notify(business_id, "message_created", {
+            "conversation_id": conv.id,
+            "role": "assistant",
+        })
 
     # CRM (spec §11-12): lead por conversación + temperatura por turno.
     lead_id = None
@@ -153,6 +183,13 @@ async def run_chat(
         conv.handoff_reason = (out.get("handoff_reason") or "")[:200]
         conv.summary = (full or "")[:2000]
         db.commit()
+        # Evento clave: un lead pasó a mano humana → todos los paneles lo ven ya.
+        await _notify(business_id, "conversation_updated", {
+            "conversation_id": conv.id,
+            "state": "human",
+            "handoff_reason": conv.handoff_reason,
+            "summary": conv.summary[:200],
+        })
         log_event(
             db,
             "handoff",

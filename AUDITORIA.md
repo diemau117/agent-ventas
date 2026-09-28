@@ -17,7 +17,7 @@
 | **WhatsApp (Twilio)** | ⚠️ Simulado | Código existe, requiere credenciales |
 | **Stripe (Pagos)** | ⚠️ Simulado | Código existe, requiere credenciales |
 | **Seguridad** | ✅ Endurecida | Admin key, headers, rate limit, presupuesto, **fail-fast de prod** |
-| **Tests** | ✅ 216 pasan | 0 fallos; suite completa en ~7 s |
+| **Tests** | ✅ 221 pasan | 0 fallos; suite completa en ~7 s |
 | **Centro de Control multi-device** | ✅ Implementado | Claim atómico, lease/heartbeat, WebSocket, resync |
 | **Real-time (WebSocket)** | ✅ Implementado | Un canal por negocio, autenticado por dispositivo |
 | **Documentación** | ✅ Completa | INSTALL.md + README.md |
@@ -236,6 +236,7 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 - Así el Bearer no queda en logs de proxy, CDN ni herramientas de diagnóstico.
 - Eventos: `conversation_claimed`, `conversation_released`, `conversation_closed`, `conversation_created`, `conversation_updated`, `message_created`, `device_revoked`.
 - Ping/pong del lado del cliente (`ping` → `pong`).
+- El flujo de chat emite además `conversation_created` (conversación nueva), `message_created` (respuesta persistida) y `conversation_updated` (handoff a humano): **el asesor ve el handoff al instante, no a los 30 s**. Son best-effort: si nadie escucha, el chat responde igual.
 - **La BD es la fuente de verdad:** el WebSocket solo notifica; ante cualquier duda el cliente hace resync.
 
 ### 7.5. Reconexión y resync
@@ -258,7 +259,7 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 
 ### 7.7. Pruebas
 
-33 tests en `tests/test_multidevice.py`: registro, auth (401/403), revocación, claim 200/409, lease expirado, heartbeat, resync de estado, concurrencia con 2 y 3 equipos, aislamiento entre tenants, **10 tests de WebSocket** (ticket one-time, expiración, ticket de dispositivo revocado, rechazo del Bearer en la URL, ping/pong, eventos en vivo, sin fugas entre tenants) y **3 tests de Consumo IA** (umbrales 50/75/90/100 y corte real 429).
+38 tests en `tests/test_multidevice.py`: registro, auth (401/403), revocación, claim 200/409, lease expirado, heartbeat, resync de estado, concurrencia con 2 y 3 equipos, aislamiento entre tenants, **12 tests de WebSocket** (ticket one-time, expiración, ticket de dispositivo revocado, rechazo del Bearer en la URL, ping/pong, eventos en vivo, 2 pestañas del mismo dispositivo, tormenta de 18 conexiones y sin fugas entre tenants), **3 tests de Consumo IA** (umbrales 50/75/90/100 y corte real 429) y **3 tests de eventos de chat en vivo** (conversación nueva, respuesta y handoff al panel).
 
 ---
 
@@ -266,12 +267,12 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 
 ### 8.1. Resultados
 
-**`python -m pytest tests/` → 216 passed, 0 failed** (≈7 s, sin dependencias externas).
+**`python -m pytest tests/` → 221 passed, 0 failed** (≈7 s, sin dependencias externas).
 
 | Suite | Tests | Estado |
 |-------|-------|--------|
 | `test_jeff.py` | 31 | ✅ |
-| **`test_multidevice.py`** | **33** | ✅ Claim, lease, heartbeat, resync, concurrencia, tenant, WebSocket + ticket y consumo IA |
+| **`test_multidevice.py`** | **38** | ✅ Claim, lease, heartbeat, resync, concurrencia, tenant, WebSocket + ticket, consumo IA y eventos de chat en vivo |
 | `test_auth_obs.py` | 17 | ✅ |
 | `test_policies_verifier.py` | 15 | ✅ |
 | `test_security.py` | 13 | ✅ Headers, rate limit, presupuesto, aislamiento |
@@ -279,7 +280,7 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 | `test_api.py` | 12 | ✅ Chat, grounding, tenant, cuota |
 | `test_config_failfast.py` | 7 | ✅ Prod sin fake LLM / sin key / con DB local |
 | Resto (12 suites) | 75 | ✅ CRM, RAG, personas, catálogo, seeds… |
-| **Total** | **216** | **✅ 0 fallos** |
+| **Total** | **221** | **✅ 0 fallos** |
 
 Fuera de pytest: `scripts/e2e_smoke.py` → **10/10** contra servidor vivo y `scripts/bench.py` → rendimiento medido (peor p95 de control **7.7 ms**; `/api/chat` con Groq real p50 **555 ms**, dominado por el modelo).
 
@@ -486,7 +487,7 @@ Fuera de pytest: `scripts/e2e_smoke.py` → **10/10** contra servidor vivo y `sc
 
 ### 13.1. Estado del Sistema
 
-El sistema está **listo para instalar el primer cliente**. Se encontró y corrigió **1 problema crítico** (onboarding desprotegido) y se implementó el **Centro de Control multi-device** completo (identidad de dispositivo, claim atómico, lease/heartbeat, WebSocket, resync). **216 tests pasan, 0 fallos**, más smoke E2E 10/10 y benchmark de rendimiento.
+El sistema está **listo para instalar el primer cliente**. Se encontró y corrigió **1 problema crítico** (onboarding desprotegido) y se implementó el **Centro de Control multi-device** completo (identidad de dispositivo, claim atómico, lease/heartbeat, WebSocket, resync). **221 tests pasan, 0 fallos**, más smoke E2E 10/10 y benchmark de rendimiento.
 
 ### 13.2. Clasificación de Hallazgos
 
@@ -516,7 +517,7 @@ El sistema está listo para producción con las siguientes consideraciones:
 
 1. **Configurar ADMIN_API_KEY** antes de exponer públicamente
 2. **WhatsApp y Stripe** requieren credenciales para funcionar (no bloquean la venta)
-3. **La suite completa está en verde:** 216 tests, 0 fallos (incluye concurrencia, WebSocket con ticket y fail-fast de prod)
+3. **La suite completa está en verde:** 221 tests, 0 fallos (incluye concurrencia, WebSocket con ticket, eventos de chat en vivo y fail-fast de prod)
 4. **El rate limiter** funciona correctamente en producción con PostgreSQL
 5. **Multi-device verificado de punta a punta:** `python scripts/e2e_smoke.py` (8/8) contra un servidor vivo
 

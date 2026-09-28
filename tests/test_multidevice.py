@@ -910,3 +910,95 @@ class TestUsageAlerts:
         assert "daily_token_budget_exceeded" in str(exc.value)
         db.close()
 
+
+
+class TestRealtimeChatEvents:
+    """El Centro de Control se entera del chat en tiempo real (no a los 30 s).
+
+    Antes solo claim/release/close emitían eventos: una conversación nueva o un
+    handoff llegaban al panel por polling. Ahora también conversation_created,
+    message_created y conversation_updated.
+    """
+
+    def _register(self, client, device_id: str, name: str = "") -> str:
+        r = client.post(
+            "/api/control-center/devices/register",
+            params={"device_id": device_id, "name": name, "token": "test-crm-token"},
+        )
+        assert r.status_code == 200, r.text
+        return r.json()["token"]
+
+    def _ticket(self, client, bearer: str) -> str:
+        r = client.post(
+            "/api/control-center/ws-ticket",
+            headers={"Authorization": f"Bearer {bearer}"},
+        )
+        assert r.status_code == 200, r.text
+        return r.json()["ticket"]
+
+    def _chat(self, client, test_business, message: str, conversation_id: int | None = None):
+        from app.api.routes import chat as chat_route
+        from app.llm.base import FakeProvider
+
+        body = {"public_key": test_business.public_key, "message": message}
+        if conversation_id:
+            body["conversation_id"] = conversation_id
+        anterior = chat_route._llm
+        chat_route._llm = FakeProvider()
+        try:
+            return client.post("/api/chat", json=body)
+        finally:
+            chat_route._llm = anterior
+
+    def test_new_conversation_is_pushed_to_open_panels(
+        self, client, test_business
+    ):
+        bearer = self._register(client, "pc-live", "PC Live")
+        ticket = self._ticket(client, bearer)
+
+        with client.websocket_connect(f"/api/control-center/ws?ticket={ticket}") as ws:
+            r = self._chat(client, test_business, "hola, ¿me ayudan con un presupuesto?")
+            assert r.status_code == 200, r.text
+            assert r.json()["conversation_id"]
+
+            e1 = ws.receive_json()
+            assert e1["type"] == "conversation_created", e1
+            e2 = ws.receive_json()
+            assert e2["type"] == "message_created", e2
+            assert e2["data"]["conversation_id"] == r.json()["conversation_id"]
+
+    def test_handoff_is_pushed_immediately(
+        self, client, test_business, test_conversation
+    ):
+        """Pide un humano → el panel recibe conversation_updated con state=human."""
+        bearer = self._register(client, "pc-live", "PC Live")
+        ticket = self._ticket(client, bearer)
+
+        with client.websocket_connect(f"/api/control-center/ws?ticket={ticket}") as ws:
+            r = self._chat(
+                client, test_business,
+                "quiero hablar con una persona, por favor",
+                conversation_id=test_conversation.id,
+            )
+            assert r.status_code == 200, r.text
+            assert r.json()["handoff"] is True, r.json()
+
+            tipos = []
+            eventos = []
+            for _ in range(3):
+                ev = ws.receive_json()
+                tipos.append(ev["type"])
+                eventos.append(ev)
+                if ev["type"] == "conversation_updated":
+                    break
+
+            assert "conversation_updated" in tipos, tipos
+            upd = next(e for e in eventos if e["type"] == "conversation_updated")
+            assert upd["data"]["state"] == "human"
+            assert upd["data"]["conversation_id"] == test_conversation.id
+
+    def test_chat_never_breaks_if_nobody_is_listening(self, client, test_business):
+        """Best-effort: sin paneles conectados el chat responde igual."""
+        r = self._chat(client, test_business, "hola")
+        assert r.status_code == 200
+        assert r.json()["reply"]
