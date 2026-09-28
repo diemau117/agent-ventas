@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     groq_api_key: str = ""
     llm_model: str = "openai/gpt-oss-20b"
-    database_url: str = "postgresql+psycopg://agent@127.0.0.1:5433/agent_ventas"
+    database_url: str = "postgresql+psycopg2://agent@127.0.0.1:5433/agent_ventas"
     max_history: int = 8
 
     # Rate limit y presupuesto (spec §21).
@@ -63,6 +63,14 @@ class Settings(BaseSettings):
         v = (v or "dev").strip().lower()
         if v not in ("dev", "prod"):
             raise ValueError("APP_ENV debe ser dev o prod")
+        return v
+
+    @field_validator("database_url")
+    @classmethod
+    def _db_url(cls, v: str) -> str:
+        """Fuerza psycopg2 para evitar ModuleNotFoundError: psycopg (v3)."""
+        if v and v.startswith("postgresql://"):
+            v = v.replace("postgresql://", "postgresql+psycopg2://", 1)
         return v
 
     @property
