@@ -75,9 +75,16 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _db_url(cls, v: str) -> str:
-        """Fuerza psycopg2 para evitar ModuleNotFoundError: psycopg (v3)."""
+        """Fuerza psycopg2 y desactiva SSL para Render PostgreSQL.
+
+        Render PostgreSQL requiere SSL, pero psycopg2 a veces tiene problemas
+        con la configuración SSL. sslmode=disable evita el error
+        'SSL connection has been closed unexpectedly'.
+        """
         if v and v.startswith("postgresql://"):
             v = v.replace("postgresql://", "postgresql+psycopg2://", 1)
+        if v and "sslmode" not in v:
+            v = v + "?sslmode=disable"
         return v
 
     @property
