@@ -20,7 +20,7 @@ def get_engine():
     # psycopg2 + Render PostgreSQL: sslmode como connect_arg es más confiable
     # que en la URL (evita "SSL connection has been closed unexpectedly")
     if "sslmode" not in url:
-        connect_args["sslmode"] = "verify-full"
+        connect_args["sslmode"] = "require"
         connect_args["sslrootcert"] = "system"
     return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
