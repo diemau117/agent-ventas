@@ -50,7 +50,7 @@ log = logging.getLogger("control_center")
 
 
 @router.post("/control-center/devices/register")
-async def register_device_endpoint(
+def register_device_endpoint(
     device_id: str = Query(...),
     name: str = Query(default=""),
     token: str = Query(...),  # CRM token for tenant resolution
@@ -105,7 +105,7 @@ async def revoke_device_endpoint(
 
 
 @router.get("/control-center/devices")
-async def list_devices(
+def list_devices(
     db: Session = Depends(get_db),
     current_device: Device = Depends(get_device_from_request),
 ):
@@ -133,7 +133,7 @@ async def list_devices(
 
 
 @router.post("/control-center/heartbeat")
-async def heartbeat(
+def heartbeat(
     db: Session = Depends(get_db),
     current_device: Device = Depends(get_device_from_request),
 ):
@@ -296,7 +296,7 @@ async def close_conversation(
 
 
 @router.get("/control-center/state")
-async def get_full_state(
+def get_full_state(
     db: Session = Depends(get_db),
     current_device: Device = Depends(get_device_from_request),
 ):
@@ -366,7 +366,7 @@ async def get_full_state(
 
 
 @router.get("/control-center/usage")
-async def get_usage(
+def get_usage(
     db: Session = Depends(get_db),
     current_device: Device = Depends(get_device_from_request),
 ):
@@ -415,7 +415,7 @@ def get_business_by_token(token: str, db: Session):
 
 
 @router.get("/control-center/leads")
-async def control_center_leads(token: str = Query(...), db: Session = Depends(get_db)):
+def control_center_leads(token: str = Query(...), db: Session = Depends(get_db)):
     """Lista leads con toda la información que necesita el asesor.
 
     Cada lead incluye:
@@ -501,7 +501,7 @@ async def control_center_leads(token: str = Query(...), db: Session = Depends(ge
 
 
 @router.get("/control-center/stats")
-async def control_center_stats(token: str = Query(...), db: Session = Depends(get_db)):
+def control_center_stats(token: str = Query(...), db: Session = Depends(get_db)):
     """Métricas rápidas para el asesor."""
     business = get_business_by_token(token, db)
     if not business:
@@ -525,7 +525,7 @@ async def control_center_stats(token: str = Query(...), db: Session = Depends(ge
 
 
 @router.post("/control-center/ws-ticket")
-async def issue_ws_ticket(
+def issue_ws_ticket(
     db: Session = Depends(get_db),
     current_device: Device = Depends(get_device_from_request),
 ):
@@ -566,6 +566,13 @@ async def websocket_endpoint(
     except HTTPException:
         await websocket.close(code=4001, reason="unauthorized")
         return
+    finally:
+        # CRÍTICO: devolver la conexión al pool INMEDIATAMENTE.
+        # Antes la sesión se mantenía abierta toda la vida del WebSocket: con
+        # ~16 paneles abiertos se agotaba el pool (15) y el event loop quedaba
+        # bloqueado hasta 30 s esperando una conexión libre → TODA la API se
+        # congelaba. El endpoint ya no usa `db` tras autenticar.
+        db.close()
 
     await manager.connect(device.business_id, device, websocket)
 
@@ -577,7 +584,7 @@ async def websocket_endpoint(
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
-        manager.disconnect(device.business_id, device.id)
+        manager.disconnect(device.business_id, device.id, websocket)
     except Exception as e:
         log.error(f"WebSocket error: {e}")
-        manager.disconnect(device.business_id, device.id)
+        manager.disconnect(device.business_id, device.id, websocket)

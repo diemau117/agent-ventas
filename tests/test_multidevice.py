@@ -740,6 +740,78 @@ class TestWebSocketRealtime:
             assert event["data"]["conversation_id"] == other_conv_id
 
 
+    def test_same_device_two_tabs_both_receive_event(
+        self, client, test_business, test_conversation
+    ):
+        """Dos pestañas del MISMO dispositivo: ambas reciben el evento.
+
+        Regresión: antes cada conexión nueva CERRABA la anterior y, con varios
+        paneles abiertos, el servidor podía quedarse bloqueado.
+        """
+        bearer = self._register(client, "pc-tabs", "PC Tabs")
+        other = self._register(client, "pc-other", "PC Other")
+        t1 = self._ticket(client, bearer)
+        t2 = self._ticket(client, bearer)
+
+        with client.websocket_connect(f"/api/control-center/ws?ticket={t1}") as ws1:
+            with client.websocket_connect(f"/api/control-center/ws?ticket={t2}") as ws2:
+                r = client.post(
+                    f"/api/control-center/conversations/{test_conversation.id}/claim",
+                    headers={"Authorization": f"Bearer {other}"},
+                )
+                assert r.status_code == 200
+
+                e1 = ws1.receive_json()
+                e2 = ws2.receive_json()
+                assert e1["type"] == "conversation_claimed"
+                assert e2["type"] == "conversation_claimed"
+                assert e1["data"]["conversation_id"] == test_conversation.id
+
+    def test_many_connections_same_device_do_not_stall_server(
+        self, client, test_business, test_conversation
+    ):
+        """Estorma: 6 conexiones del mismo dispositivo + el servidor sigue vivo.
+
+        Regresión del bloqueo del event loop al cerrar conexiones anteriores.
+        """
+        # 18 > pool_size(5) + max_overflow(10): si alguna conexión retuviera
+        # su sesión SQL, esto agotaría el pool y congelaría el event loop.
+        bearer = self._register(client, "pc-storm", "PC Storm")
+        other = self._register(client, "pc-other", "PC Other")
+        tickets = [self._ticket(client, bearer) for _ in range(18)]
+
+        sockets = [
+            client.websocket_connect(f"/api/control-center/ws?ticket={tk}").__enter__()
+            for tk in tickets
+        ]
+        try:
+            # El servidor debe seguir respondiendo con todas esas conexiones abiertas
+            hb = client.post(
+                "/api/control-center/heartbeat",
+                headers={"Authorization": f"Bearer {bearer}"},
+            )
+            assert hb.status_code == 200
+
+            r = client.post(
+                f"/api/control-center/conversations/{test_conversation.id}/claim",
+                headers={"Authorization": f"Bearer {other}"},
+            )
+            assert r.status_code == 200
+
+            recibidas = 0
+            for ws in sockets:
+                evt = ws.receive_json()
+                if evt["type"] == "conversation_claimed":
+                    recibidas += 1
+            assert recibidas == 18, f"solo recibieron {recibidas}/18"
+        finally:
+            for ws in sockets:
+                try:
+                    ws.__exit__(None, None, None)
+                except Exception:
+                    pass
+
+
 class TestUsageAlerts:
     """Consumo IA: umbrales 50/75/90/100 + corte real del presupuesto."""
 

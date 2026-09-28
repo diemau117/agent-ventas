@@ -184,3 +184,23 @@ Referencia medida en local (SQLite, 50 peticiones/endpoint):
 
 Los endpoints de control están por debajo de **10 ms p95**; la latencia del
 chat la domina el modelo LLM, no la aplicación.
+
+### Capacidad medida (servidor local, datos reales: 50 conversaciones / 1000 mensajes)
+
+| Prueba | Resultado |
+|---|---|
+| Memoria del proceso | **126 MB** RSS |
+| `GET /state` 1 usuario | 120 req/s · p50 8 ms · p95 9.6 ms |
+| `GET /state` 20 y 40 usuarios simultáneos | ~52 req/s · p95 476 / 890 ms · **0 errores** |
+| Paneles WebSocket simultáneos (5 / 20 / 50) | todos conectan · heartbeat **4 ms** |
+| Fan-out de un evento a 50 paneles | **15 ms** hasta el último |
+| `POST /api/chat` con Groq real | p50 555 ms |
+
+```bash
+python scripts/ws_debug.py <CRM_TOKEN> 50   # 50 paneles abiertos
+python scripts/load_test.py <CRM_TOKEN> 20 200   # carga HTTP + fan-out
+```
+
+**Regresión protegida en tests:** `test_many_connections_same_device_do_not_stall_server`
+abre 18 conexiones (más que el pool de 15) y exige que el servidor siga vivo; si
+alguien vuelve a retener sesiones en los WebSockets, el test falla.

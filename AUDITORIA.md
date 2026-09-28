@@ -424,6 +424,9 @@ Fuera de pytest: `scripts/e2e_smoke.py` → **10/10** contra servidor vivo y `sc
 | SQLite podía usarse en prod | ✅ Resuelto | Fail-fast: `DATABASE_URL` sqlite → no arranca |
 | `/usage` reportaba el presupuesto global | ✅ Resuelto | Usa `Business.daily_token_budget` (el mismo que corta) |
 | Sin medición de rendimiento | ✅ Resuelto | `scripts/bench.py` (p50/p95 por endpoint) |
+| **API se congelaba con ~16 paneles abiertos** | ✅ Resuelto | Cada WebSocket retenía su sesión SQL: agotaba el pool (15) y bloqueaba el event loop 30 s. Ahora se cierra tras autenticar |
+| Un dispositivo solo podía tener 1 conexión | ✅ Resuelto | N conexiones por dispositivo (pestañas/multi-monitor) sin cerrar las anteriores |
+| Queries en el event loop | ✅ Resuelto | Endpoints de solo BD pasan a `def` (threadpool): el loop nunca se bloquea |
 
 ### 11.2. Pendientes (No críticos)
 
