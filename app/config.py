@@ -105,20 +105,33 @@ class Settings(BaseSettings):
         return self.app_env == "prod"
 
     def validate_runtime(self) -> None:
-        """Fail-fast al arrancar: en prod, key y DB reales son obligatorias.
+        """Fail-fast al arrancar: en prod, key real, DB real y LLM real obligatorios.
 
         Sin esto, un despliegue sin GROQ_API_KEY caería en silencio a
         FakeProvider y el bot "respondería" con datos inventados.
+
+        Regla dura: **production + ALLOW_FAKE_LLM=true → NO ARRANCA**.
+        No es un warning: es una clase completa de error humano (un deploy
+        olvidando una variable) eliminada de raíz. Si alguna vez se necesita
+        el fake en un entorno parecido a prod, se usa APP_ENV=dev.
         """
         if not self.is_prod:
             return
         problems = []
         if not self.groq_api_key:
             problems.append("GROQ_API_KEY vacía en APP_ENV=prod")
+        if self.allow_fake_llm:
+            problems.append(
+                "ALLOW_FAKE_LLM=true en APP_ENV=prod — producción exige el LLM real "
+                "(define ALLOW_FAKE_LLM=false y GROQ_API_KEY)"
+            )
         if "127.0.0.1" in self.database_url or "localhost" in self.database_url:
             problems.append("DATABASE_URL apunta a localhost en APP_ENV=prod")
-        if not self.allow_fake_llm and not self.groq_api_key:
-            problems.append("ALLOW_FAKE_LLM=false sin GROQ_API_KEY")
+        if self.database_url.startswith("sqlite"):
+            problems.append(
+                "DATABASE_URL es SQLite en APP_ENV=prod — producción usa PostgreSQL "
+                "(SQLite es un archivo local: se pierde entre despliegues)"
+            )
         if problems:
             raise RuntimeError("Configuración de producción inválida: " + "; ".join(problems))
 

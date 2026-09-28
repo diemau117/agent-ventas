@@ -548,7 +548,14 @@ class TestTenantIsolation:
 
 
 class TestWebSocketRealtime:
-    """Tests del canal real-time: WebSocket por negocio + auth de dispositivo."""
+    """Canal real-time: ticket one-time por encima del Bearer permanente.
+
+    Flujo obligatorio:
+        Bearer (header) → POST /ws-ticket → ticket de 60 s y un solo uso
+        → WS /control-center/ws?ticket=...
+    El token permanente jamás aparece en una URL (evita que quede en logs
+    de proxy/CDN/herramientas de diagnóstico).
+    """
 
     def _register(self, client, device_id: str, name: str = "") -> str:
         r = client.post(
@@ -558,22 +565,93 @@ class TestWebSocketRealtime:
         assert r.status_code == 200, r.text
         return r.json()["token"]
 
-    def test_ws_invalid_token_is_rejected(self, client):
-        """Un token de dispositivo inválido no abre el WebSocket."""
+    def _ticket(self, client, bearer: str) -> str:
+        r = client.post(
+            "/api/control-center/ws-ticket",
+            headers={"Authorization": f"Bearer {bearer}"},
+        )
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["single_use"] is True
+        assert data["expires_in"] == 60
+        return data["ticket"]
+
+    def test_ws_ticket_requires_bearer(self, client):
+        """Sin Bearer no hay ticket."""
+        assert client.post("/api/control-center/ws-ticket").status_code == 401
+        assert client.post(
+            "/api/control-center/ws-ticket",
+            headers={"Authorization": "Bearer invalido"},
+        ).status_code == 401
+
+    def test_ws_rejects_invalid_ticket(self, client):
         from starlette.websockets import WebSocketDisconnect
 
         with pytest.raises(WebSocketDisconnect):
-            with client.websocket_connect(
-                "/api/control-center/ws?token=not-a-real-token"
-            ):
+            with client.websocket_connect("/api/control-center/ws?ticket=not-a-real"):
+                pass
+
+    def test_ws_permanent_token_in_url_is_rejected(self, client, test_business):
+        """Endurecimiento: el Bearer ya NO abre el WebSocket, solo el ticket."""
+        from starlette.websockets import WebSocketDisconnect
+
+        bearer = self._register(client, "pc-token-url", "PC Token")
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect(f"/api/control-center/ws?token={bearer}"):
+                pass
+
+    def test_ws_ticket_is_single_use(self, client, test_business):
+        from starlette.websockets import WebSocketDisconnect
+
+        bearer = self._register(client, "pc-single", "PC Single")
+        ticket = self._ticket(client, bearer)
+
+        with client.websocket_connect(f"/api/control-center/ws?ticket={ticket}") as ws:
+            ws.send_text("ping")
+            assert ws.receive_text() == "pong"
+
+        # Segunda conexión con el mismo ticket → rechazada
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect(f"/api/control-center/ws?ticket={ticket}"):
+                pass
+
+    def test_ws_ticket_expires(self, client, test_business):
+        from starlette.websockets import WebSocketDisconnect
+
+        from app.device_auth import _WS_TICKETS
+
+        bearer = self._register(client, "pc-exp", "PC Exp")
+        ticket = self._ticket(client, bearer)
+        device_pk, _ = _WS_TICKETS[ticket]
+        _WS_TICKETS[ticket] = (device_pk, 0)  # forzar expiración
+
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect(f"/api/control-center/ws?ticket={ticket}"):
+                pass
+        assert ticket not in _WS_TICKETS  # se consume aunque esté vencido
+
+    def test_ws_ticket_of_revoked_device_is_rejected(self, client, test_business):
+        """Revocar DESPUÉS de emitir el ticket: el estado se re-verifica."""
+        from starlette.websockets import WebSocketDisconnect
+
+        bearer = self._register(client, "pc-rev", "PC Rev")
+        ticket = self._ticket(client, bearer)
+
+        db = TestingSessionLocal()
+        device = db.query(Device).filter(Device.device_id == "pc-rev").first()
+        device.status = "revoked"
+        db.commit()
+        db.close()
+
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect(f"/api/control-center/ws?ticket={ticket}"):
                 pass
 
     def test_ws_ping_pong(self, client, test_business):
         """El canal responde a heartbeats del cliente."""
-        token = self._register(client, "pc-ws", "PC WS")
-        with client.websocket_connect(
-            f"/api/control-center/ws?token={token}"
-        ) as ws:
+        bearer = self._register(client, "pc-ws", "PC WS")
+        ticket = self._ticket(client, bearer)
+        with client.websocket_connect(f"/api/control-center/ws?ticket={ticket}") as ws:
             ws.send_text("ping")
             assert ws.receive_text() == "pong"
 
@@ -583,18 +661,17 @@ class TestWebSocketRealtime:
         """PC2 está escuchando; PC1 toma la conversación → PC2 se entera al instante."""
         token1 = self._register(client, "pc-1", "PC 1")
         token2 = self._register(client, "pc-2", "PC 2")
+        ticket2 = self._ticket(client, token2)
 
         with client.websocket_connect(
-            f"/api/control-center/ws?token={token2}"
+            f"/api/control-center/ws?ticket={ticket2}"
         ) as ws:
-            # PC1 toma la conversación vía HTTP
             r = client.post(
                 f"/api/control-center/conversations/{test_conversation.id}/claim",
                 headers={"Authorization": f"Bearer {token1}"},
             )
             assert r.status_code == 200
 
-            # PC2 recibe el evento de inmediato
             event = ws.receive_json()
             assert event["type"] == "conversation_claimed"
             assert event["data"]["conversation_id"] == test_conversation.id
@@ -604,6 +681,7 @@ class TestWebSocketRealtime:
         """El dispositivo que libera notifica a los demás."""
         token1 = self._register(client, "pc-1", "PC 1")
         token2 = self._register(client, "pc-2", "PC 2")
+        ticket2 = self._ticket(client, token2)
 
         r = client.post(
             f"/api/control-center/conversations/{test_conversation.id}/claim",
@@ -612,7 +690,7 @@ class TestWebSocketRealtime:
         assert r.status_code == 200
 
         with client.websocket_connect(
-            f"/api/control-center/ws?token={token2}"
+            f"/api/control-center/ws?ticket={ticket2}"
         ) as ws:
             r = client.post(
                 f"/api/control-center/conversations/{test_conversation.id}/release",
@@ -628,7 +706,6 @@ class TestWebSocketRealtime:
         self, client, test_business, test_conversation
     ):
         """Un negocio ajeno no recibe los eventos de otro."""
-        # Otro negocio con su dispositivo
         db = TestingSessionLocal()
         other = Business(name="Otros", public_key="other-pk2", crm_token="other-crm")
         db.add(other)
@@ -637,29 +714,127 @@ class TestWebSocketRealtime:
         db.add(other_conv)
         db.commit()
         other_conv_id = other_conv.id
-        other_token_row = _create_device(db, other.id, "pc-otro", "PC Otro")
+        _dev, other_token = _create_device(db, other.id, "pc-otro", "PC Otro")
         db.close()
-        other_token = other_token_row[1]
 
         token1 = self._register(client, "pc-1", "PC 1")
+        other_ticket = self._ticket(client, other_token)
 
         with client.websocket_connect(
-            f"/api/control-center/ws?token={other_token}"
+            f"/api/control-center/ws?ticket={other_ticket}"
         ) as ws:
-            # El negocio de prueba toma su conversación
             r = client.post(
                 f"/api/control-center/conversations/{test_conversation.id}/claim",
                 headers={"Authorization": f"Bearer {token1}"},
             )
             assert r.status_code == 200
 
-            # El negocio ajeno no debe recibir nada: reclamamos su propia
-            # conversación para forzar un broadcast en su canal.
+            # Broadcast en el canal del otro negocio…
             r2 = client.post(
                 f"/api/control-center/conversations/{other_conv_id}/claim",
                 headers={"Authorization": f"Bearer {other_token}"},
             )
             assert r2.status_code == 200
             event = ws.receive_json()
-            # Solo el evento de SU negocio, jamás el del negocio de prueba.
+            # …solo recibe SU evento, jamás el del negocio de prueba.
             assert event["data"]["conversation_id"] == other_conv_id
+
+
+class TestUsageAlerts:
+    """Consumo IA: umbrales 50/75/90/100 + corte real del presupuesto."""
+
+    def _register(self, client) -> str:
+        r = client.post(
+            "/api/control-center/devices/register",
+            params={"device_id": "pc-usage", "name": "PC Uso", "token": "test-crm-token"},
+        )
+        assert r.status_code == 200, r.text
+        return r.json()["token"]
+
+    def _usage(self, client, bearer: str) -> dict:
+        r = client.get(
+            "/api/control-center/usage",
+            headers={"Authorization": f"Bearer {bearer}"},
+        )
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    def _set_tokens(self, business_id: int, tokens: int) -> None:
+        from app.db.models import Message
+
+        db = TestingSessionLocal()
+        conv = db.query(Conversation).filter(Conversation.business_id == business_id).first()
+        if conv is None:
+            conv = Conversation(business_id=business_id, channel="web", state="ai")
+            db.add(conv)
+            db.commit()
+        db.add(Message(
+            conversation_id=conv.id, role="assistant", content="x",
+            tokens_in=tokens, tokens_out=0,
+        ))
+        db.commit()
+        db.close()
+
+    def test_usage_requires_bearer(self, client):
+        assert client.get("/api/control-center/usage").status_code == 401
+
+    def test_usage_levels_cross_all_thresholds(self, client, test_business):
+        from app.db.models import Message
+
+        bearer = self._register(client)
+
+        # Sin consumo → ok
+        u = self._usage(client, bearer)
+        assert u["level"] == "ok" and u["percent"] == 0
+
+        # Presupuesto de 1000 tokens para poder cruzar umbrales
+        db = TestingSessionLocal()
+        b = db.query(Business).filter(Business.id == test_business.id).first()
+        b.daily_token_budget = 1000
+        conv = Conversation(business_id=b.id, channel="web", state="ai")
+        db.add(conv)
+        db.commit()
+        conv_id = conv.id
+        db.close()
+
+        # deltas acumulativos: 520 → 760 → 930 → 1500 sobre presupuesto de 1000
+        for tokens, esperado in [(520, "attention"), (240, "warning"),
+                                 (170, "critical"), (570, "blocked")]:
+            db = TestingSessionLocal()
+            db.add(Message(conversation_id=conv_id, role="assistant",
+                           content="x", tokens_in=tokens, tokens_out=0))
+            db.commit()
+            db.close()
+            u = self._usage(client, bearer)
+            assert u["level"] == esperado, (tokens, u)
+            if esperado == "blocked":
+                assert u["percent"] == 100.0
+                assert u["remaining_tokens"] == 0
+
+    def test_daily_budget_actually_blocks_chat(self, client, test_business):
+        """Al 100% el presupuesto corta los mensajes (429), no solo avisa."""
+        from app.db.models import Message
+
+        # presupuesto agotado
+        db = TestingSessionLocal()
+        b = db.query(Business).filter(Business.id == test_business.id).first()
+        b.daily_token_budget = 100
+        conv = Conversation(business_id=b.id, channel="web", state="ai")
+        db.add(conv)
+        db.commit()
+        conv_id = conv.id
+        db.close()
+
+        from app.limits import check_business_limits
+
+        db = TestingSessionLocal()
+        business = db.query(Business).filter(Business.id == test_business.id).first()
+        db.add(Message(conversation_id=conv_id, role="assistant",
+                       content="x", tokens_in=150, tokens_out=0))
+        db.commit()
+
+        with pytest.raises(Exception) as exc:
+            check_business_limits(db, business)
+        assert "daily_token_budget_exceeded" in str(exc.value)
+        db.close()
+

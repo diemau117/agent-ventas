@@ -16,8 +16,8 @@
 | **Agente AI (LangGraph)** | ✅ Funcional | Grafo classify → act → verify |
 | **WhatsApp (Twilio)** | ⚠️ Simulado | Código existe, requiere credenciales |
 | **Stripe (Pagos)** | ⚠️ Simulado | Código existe, requiere credenciales |
-| **Seguridad** | ✅ Endurecida | Admin key, headers, rate limit, presupuesto |
-| **Tests** | ✅ 201 pasan | 0 fallos; suite completa en ~7 s |
+| **Seguridad** | ✅ Endurecida | Admin key, headers, rate limit, presupuesto, **fail-fast de prod** |
+| **Tests** | ✅ 216 pasan | 0 fallos; suite completa en ~7 s |
 | **Centro de Control multi-device** | ✅ Implementado | Claim atómico, lease/heartbeat, WebSocket, resync |
 | **Real-time (WebSocket)** | ✅ Implementado | Un canal por negocio, autenticado por dispositivo |
 | **Documentación** | ✅ Completa | INSTALL.md + README.md |
@@ -231,7 +231,9 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 
 ### 7.4. Tiempo real (WebSocket)
 
-- `WS /api/control-center/ws?token=<device_token>` — un canal por negocio, autenticado con el mismo token de dispositivo.
+- **El token permanente NUNCA viaja en la URL.** Flujo: `Authorization: Bearer <device_token>` → `POST /control-center/ws-ticket` → ticket **one-time de 60 s** → `WS /control-center/ws?ticket=...`.
+- Un canal por negocio; el ticket se consume en el primer intento y el estado del dispositivo (revocado o no) **se re-verifica al conectar**, no se cachea en el ticket.
+- Así el Bearer no queda en logs de proxy, CDN ni herramientas de diagnóstico.
 - Eventos: `conversation_claimed`, `conversation_released`, `conversation_closed`, `conversation_created`, `conversation_updated`, `message_created`, `device_revoked`.
 - Ping/pong del lado del cliente (`ping` → `pong`).
 - **La BD es la fuente de verdad:** el WebSocket solo notifica; ante cualquier duda el cliente hace resync.
@@ -244,6 +246,7 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 | Reconexión | `GET /api/control-center/state` (leads, conversaciones con lease, citas) + refresh de stats |
 | Respaldo | Polling cada 30 s, refresco al volver a la pestaña, heartbeat HTTP cada 60 s |
 | Token caducado/401 | Re-registro automático del dispositivo y reintento único |
+| Ticket WS vencido | Cada reconexión pide un **ticket nuevo** (one-time, 60 s) |
 
 ### 7.6. Frontend (`frontend/panel.html`)
 
@@ -255,7 +258,7 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 
 ### 7.7. Pruebas
 
-25 tests en `tests/test_multidevice.py`: registro, auth (401/403), revocación, claim 200/409, lease expirado, heartbeat, resync de estado, concurrencia con 2 y 3 equipos, aislamiento entre tenants y 5 tests de WebSocket (rechazo sin token, ping/pong, eventos `claim`/`release` en vivo y ausencia de fugas entre tenants).
+33 tests en `tests/test_multidevice.py`: registro, auth (401/403), revocación, claim 200/409, lease expirado, heartbeat, resync de estado, concurrencia con 2 y 3 equipos, aislamiento entre tenants, **10 tests de WebSocket** (ticket one-time, expiración, ticket de dispositivo revocado, rechazo del Bearer en la URL, ping/pong, eventos en vivo, sin fugas entre tenants) y **3 tests de Consumo IA** (umbrales 50/75/90/100 y corte real 429).
 
 ---
 
@@ -263,19 +266,22 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 
 ### 8.1. Resultados
 
-**`python -m pytest tests/` → 201 passed, 0 failed** (≈7 s, sin dependencias externas).
+**`python -m pytest tests/` → 216 passed, 0 failed** (≈7 s, sin dependencias externas).
 
 | Suite | Tests | Estado |
 |-------|-------|--------|
 | `test_jeff.py` | 31 | ✅ |
-| **`test_multidevice.py`** | **25** | ✅ Claim, lease, heartbeat, resync, concurrencia, tenant y WebSocket |
+| **`test_multidevice.py`** | **33** | ✅ Claim, lease, heartbeat, resync, concurrencia, tenant, WebSocket + ticket y consumo IA |
 | `test_auth_obs.py` | 17 | ✅ |
 | `test_policies_verifier.py` | 15 | ✅ |
 | `test_security.py` | 13 | ✅ Headers, rate limit, presupuesto, aislamiento |
 | `test_chatwoot.py` | 13 | ✅ |
 | `test_api.py` | 12 | ✅ Chat, grounding, tenant, cuota |
-| Resto (9 suites) | 75 | ✅ CRM, RAG, personas, catálogo, seeds… |
-| **Total** | **201** | **✅ 0 fallos** |
+| `test_config_failfast.py` | 7 | ✅ Prod sin fake LLM / sin key / con DB local |
+| Resto (12 suites) | 75 | ✅ CRM, RAG, personas, catálogo, seeds… |
+| **Total** | **216** | **✅ 0 fallos** |
+
+Fuera de pytest: `scripts/e2e_smoke.py` → **10/10** contra servidor vivo y `scripts/bench.py` → rendimiento medido (peor p95 de control **7.7 ms**; `/api/chat` con Groq real p50 **555 ms**, dominado por el modelo).
 
 ### 8.2. Aislamiento de tests (corregido)
 
@@ -317,7 +323,8 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 | `GROQ_API_KEY` | ✅ (prod) | `""` | API key de Groq |
 | `DATABASE_URL` | ✅ (prod) | `postgresql://agent@127.0.0.1:5433/agent_ventas` | URL de PostgreSQL |
 | `ADMIN_API_KEY` | ✅ (prod) | `""` | Protege onboarding e init-db |
-| `ALLOW_FAKE_LLM` | ❌ | `true` | Permite FakeProvider |
+| *(fail-fast prod)* | — | — | `GROQ_API_KEY` vacía, `ALLOW_FAKE_LLM=true`, `DATABASE_URL` local o SQLite → **no arranca** |
+| `ALLOW_FAKE_LLM` | ❌ | `true` | FakeProvider solo fuera de prod. **En prod `true` → el servidor NO arranca** (fail-fast) |
 | `RATE_LIMIT_PER_MIN` | ❌ | `30` | Rate limit por IP |
 | `DAILY_TOKEN_BUDGET` | ❌ | `200000` | Presupuesto diario de tokens |
 | `TRUST_PROXY_HEADERS` | ❌ | `false` | Confiar en headers de proxy |
@@ -386,7 +393,9 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 | `/api/control-center/conversations/{id}/claim` | POST | ✅ 200/409 | Claim atómico (Bearer) |
 | `/api/control-center/conversations/{id}/release` | POST | ✅ 200/403 | Libera conversación propia |
 | `/api/control-center/conversations/{id}/close` | POST | ✅ 200 | Cierra conversación |
-| `/api/control-center/ws` | WS | ✅ 101 | Real-time por negocio (token de dispositivo) |
+| `/api/control-center/ws-ticket` | POST | ✅ 200 | Ticket WS one-time de 60 s (Bearer) |
+| `/api/control-center/ws` | WS | ✅ 101 | Real-time por negocio (`?ticket=` one-time) |
+| `/api/control-center/usage` | GET | ✅ 200 | Consumo IA + nivel de alerta (Bearer) |
 | `/api/whatsapp/*` | POST | ⚠️ Simulado | Requiere credenciales |
 | `/api/stripe/*` | POST | ⚠️ Simulado | Requiere credenciales |
 
@@ -410,6 +419,11 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 | Migración no corría en Render | ✅ Resuelto | `startCommand: alembic upgrade head && uvicorn …` |
 | Migración incompatible con SQLite | ✅ Resuelto | `batch_alter_table` para la FK + `sa.func.now()` |
 | Centro de Control solo 1 equipo | ✅ Resuelto | Multi-device: claim, lease, WebSocket, resync |
+| Bearer en la URL del WebSocket | ✅ Resuelto | Ticket one-time de 60 s (`POST /ws-ticket`) |
+| `ALLOW_FAKE_LLM` podía pasar en prod | ✅ Resuelto | Fail-fast: prod + fake → no arranca |
+| SQLite podía usarse en prod | ✅ Resuelto | Fail-fast: `DATABASE_URL` sqlite → no arranca |
+| `/usage` reportaba el presupuesto global | ✅ Resuelto | Usa `Business.daily_token_budget` (el mismo que corta) |
+| Sin medición de rendimiento | ✅ Resuelto | `scripts/bench.py` (p50/p95 por endpoint) |
 
 ### 11.2. Pendientes (No críticos)
 
@@ -420,6 +434,8 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 | Token CRM en query param (endpoints legacy) | Logs pueden filtrar tokens; el panel ya usa Bearer | P2 |
 | Docker no se pudo construir en local | Daemon apagado; `docker compose config` OK y arranque verificado con uvicorn | P3 |
 | Bug en get_tool_usage_stats | Estadísticas incorrectas | P3 |
+| Tickets WS en memoria | Solo 1 proceso (Render Free OK); con múltiples instancias → Redis/BD | P3 |
+| Token en localStorage del panel | Viable hoy con CSP+escape; migrar a cookie HttpOnly/SameSite en la versión comercial | P3 |
 | Claim sin lock en SQLite | Solo tests/dev; producción usa PostgreSQL con `FOR UPDATE` | P3 |
 
 ---
@@ -467,7 +483,7 @@ Varios computadores de la misma empresa operan el Centro de Control sobre el **m
 
 ### 13.1. Estado del Sistema
 
-El sistema está **listo para instalar el primer cliente**. Se encontró y corrigió **1 problema crítico** (onboarding desprotegido) y se implementó el **Centro de Control multi-device** completo (identidad de dispositivo, claim atómico, lease/heartbeat, WebSocket, resync). **201 tests pasan, 0 fallos.**
+El sistema está **listo para instalar el primer cliente**. Se encontró y corrigió **1 problema crítico** (onboarding desprotegido) y se implementó el **Centro de Control multi-device** completo (identidad de dispositivo, claim atómico, lease/heartbeat, WebSocket, resync). **216 tests pasan, 0 fallos**, más smoke E2E 10/10 y benchmark de rendimiento.
 
 ### 13.2. Clasificación de Hallazgos
 
@@ -486,7 +502,7 @@ El sistema está listo para producción con las siguientes consideraciones:
 
 1. **Configurar ADMIN_API_KEY** antes de exponer públicamente
 2. **WhatsApp y Stripe** requieren credenciales para funcionar (no bloquean la venta)
-3. **La suite completa está en verde:** 201 tests, 0 fallos (incluye concurrencia y WebSocket multi-device)
+3. **La suite completa está en verde:** 216 tests, 0 fallos (incluye concurrencia, WebSocket con ticket y fail-fast de prod)
 4. **El rate limiter** funciona correctamente en producción con PostgreSQL
 5. **Multi-device verificado de punta a punta:** `python scripts/e2e_smoke.py` (8/8) contra un servidor vivo
 

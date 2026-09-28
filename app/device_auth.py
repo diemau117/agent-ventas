@@ -6,6 +6,7 @@ perteneciente a un negocio. El dispositivo se autentica con un Bearer token
 """
 import hashlib
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, Request
@@ -148,3 +149,61 @@ def get_lease_duration_seconds() -> int:
 def get_heartbeat_interval_seconds() -> int:
     """Intervalo de heartbeat en segundos (configurable)."""
     return getattr(settings, "device_heartbeat_interval_seconds", 60)  # 1 min default
+
+
+# ============================================================================
+# Tickets de WebSocket (one-time, corta vida)
+# ============================================================================
+# El Bearer token es permanente: NO debe viajar en la URL del WebSocket
+# (las URLs terminan en logs de proxy, CDNs y herramientas de diagnóstico).
+# En su lugar el cliente pide un ticket de un solo uso, válido pocos segundos.
+#
+# Almacenamiento en memoria: Render Free corre un solo proceso, así que es
+# suficiente. Si algún día hay múltiples instancias, moverlo a Redis/BD.
+
+WS_TICKET_TTL_SECONDS = 60
+_WS_TICKETS: dict[str, tuple[int, float]] = {}  # ticket -> (device_pk, expira_en_epoch)
+_WS_TICKET_MAX = 10_000
+
+
+def _prune_tickets(now: float) -> None:
+    """Elimina tickets expirados y aplica un tope de tamaño."""
+    expired = [t for t, (_, exp) in _WS_TICKETS.items() if exp <= now]
+    for t in expired:
+        _WS_TICKETS.pop(t, None)
+    # Tope de seguridad: si alguien dispara emisiones masivas, descarta los más viejos.
+    while len(_WS_TICKETS) > _WS_TICKET_MAX:
+        oldest = min(_WS_TICKETS, key=lambda k: _WS_TICKETS[k][1])
+        _WS_TICKETS.pop(oldest, None)
+
+
+def create_ws_ticket(device_pk: int, ttl: int | None = None) -> str:
+    """Emite un ticket de WebSocket de un solo uso para un dispositivo."""
+    now = time.time()
+    _prune_tickets(now)
+    ticket = secrets.token_urlsafe(32)
+    _WS_TICKETS[ticket] = (device_pk, now + (ttl or WS_TICKET_TTL_SECONDS))
+    return ticket
+
+
+def consume_ws_ticket(ticket: str, db: Session) -> Device:
+    """Canjea un ticket por su Device. De un solo uso: se consume siempre.
+
+    Lanza HTTPException 401 si es inválido/expirado y 403 si el dispositivo
+    fue revocado (el estado se re-verifica en cada conexión, no se cachea
+    dentro del ticket).
+    """
+    if not ticket:
+        raise HTTPException(status_code=401, detail="ws_ticket_required")
+
+    now = time.time()
+    entry = _WS_TICKETS.pop(ticket, None)  # un solo uso, se consume pase lo que pase
+    if not entry or entry[1] <= now:
+        raise HTTPException(status_code=401, detail="ws_ticket_invalid_or_expired")
+
+    device = db.query(Device).filter(Device.id == entry[0]).first()
+    if not device:
+        raise HTTPException(status_code=401, detail="device_not_found")
+    if device.status == "revoked":
+        raise HTTPException(status_code=403, detail="device_revoked")
+    return device

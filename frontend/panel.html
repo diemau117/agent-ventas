@@ -58,6 +58,19 @@
     .toast-item { background: #111827; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px;
       box-shadow: 0 4px 12px rgba(0,0,0,.25); animation: slidein .2s ease; }
     @keyframes slidein { from { transform: translateY(10px); opacity: 0; } }
+
+    /* Consumo IA (margen + protección) */
+    .usage-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
+    .usage-bar { height: 22px; background: #e5e7eb; border-radius: 12px; overflow: hidden; }
+    .usage-fill { height: 100%; width: 0; border-radius: 12px; transition: width .4s ease; background: #10b981; }
+    .usage-fill.lvl-attention { background: #f59e0b; }
+    .usage-fill.lvl-warning { background: #f97316; }
+    .usage-fill.lvl-critical, .usage-fill.lvl-blocked { background: #dc2626; }
+    .usage-meta { display: flex; align-items: center; gap: 14px; margin-top: 10px; font-size: 13px; color: #374151; }
+    .usage-level { font-weight: 700; padding: 2px 10px; border-radius: 10px; background: #d1fae5; color: #047857; }
+    .usage-level.lvl-attention { background: #fef3c7; color: #b45309; }
+    .usage-level.lvl-warning { background: #ffedd5; color: #c2410c; }
+    .usage-level.lvl-critical, .usage-level.lvl-blocked { background: #fee2e2; color: #dc2626; }
   </style>
 </head>
 <body>
@@ -66,6 +79,7 @@
       <a class="brand" href="/panel">Agent Ventas</a>
       <nav class="nav">
         <a href="#dashboard">Dashboard</a>
+        <a href="#consumo">Consumo IA</a>
         <a href="#conversaciones">Conversaciones</a>
         <a href="#leads">Leads</a>
         <a href="#citas">Citas</a>
@@ -105,6 +119,20 @@
             <div class="stat-number" id="stat-activas">0</div>
             <div class="stat-label">Conversaciones activas</div>
           </div>
+        </div>
+      </section>
+
+      <!-- Consumo IA -->
+      <section id="consumo" class="seccion">
+        <h2>Consumo IA de hoy</h2>
+        <div class="usage-box">
+          <div class="usage-bar"><div class="usage-fill" id="usage-fill"></div></div>
+          <div class="usage-meta">
+            <strong id="usage-pct">0%</strong>
+            <span id="usage-detail">cargando…</span>
+            <span class="usage-level" id="usage-level">—</span>
+          </div>
+          <p class="nota">Presupuesto diario: si llega al 100% los mensajes se cortan automáticamente (429).</p>
         </div>
       </section>
 
@@ -469,8 +497,29 @@
       } catch (err) { console.error(err); }
     }
 
+    async function cargarConsumo() {
+      try {
+        const res = await api('/api/control-center/usage');
+        if (!res.ok) return;
+        const u = await res.json();
+        const fill = document.getElementById('usage-fill');
+        fill.style.width = (u.percent || 0) + '%';
+        fill.className = 'usage-fill lvl-' + u.level;
+        document.getElementById('usage-pct').textContent = (u.percent || 0) + '%';
+        document.getElementById('usage-detail').textContent =
+          (u.tokens_today / 1000).toFixed(1) + 'k / ' + (u.daily_token_budget / 1000).toFixed(0) +
+          'k tokens · quedan ' + (u.remaining_tokens / 1000).toFixed(1) + 'k';
+        const labels = { ok: 'Normal', attention: 'Atención 50%', warning: 'Aviso 75%',
+                         critical: 'Crítico 90%', blocked: 'Bloqueado 100%' };
+        const el = document.getElementById('usage-level');
+        el.textContent = labels[u.level] || u.level;
+        el.className = 'usage-level lvl-' + u.level;
+      } catch (err) { console.error(err); }
+    }
+
     function refreshAll() {
       cargarDashboard();
+      cargarConsumo();
       cargarLeads();
       cargarCitas();
       resync();
@@ -484,14 +533,25 @@
     let reconnectTimer = null;
     let heartbeatTimer = null;
 
-    function wsUrl() {
+    function wsUrl(ticket) {
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      return proto + '//' + location.host + '/api/control-center/ws?token=' + encodeURIComponent(DEVICE_TOKEN);
+      // Solo el ticket (one-time, 60 s). El Bearer permanente NUNCA va en la URL.
+      return proto + '//' + location.host + '/api/control-center/ws?ticket=' + encodeURIComponent(ticket);
     }
 
-    function connectWS() {
+    async function connectWS() {
       if (!DEVICE_TOKEN) return;
-      try { ws = new WebSocket(wsUrl()); } catch (e) { scheduleReconnect(); return; }
+
+      // 1) Pedir ticket de un solo uso con el Bearer (header, no URL)
+      let ticket;
+      try {
+        const res = await api('/api/control-center/ws-ticket', { method: 'POST' });
+        if (!res.ok) { scheduleReconnect(); return; }
+        ticket = (await res.json()).ticket;
+      } catch (e) { scheduleReconnect(); return; }
+
+      // 2) Conectar con el ticket
+      try { ws = new WebSocket(wsUrl(ticket)); } catch (e) { scheduleReconnect(); return; }
 
       ws.onopen = () => {
         wsAttempts = 0;

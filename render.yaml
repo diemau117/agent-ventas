@@ -12,6 +12,9 @@ services:
     envVars:
       - key: APP_ENV
         value: prod
+      # Fail-fast: con true el servidor se NIEGA a arrancar en prod (FakeProvider).
+      - key: ALLOW_FAKE_LLM
+        value: "false"
       - key: SECRET_KEY
         generateValue: true
       # API key para endpoints admin (/api/onboarding). Visible en el dashboard de Render.

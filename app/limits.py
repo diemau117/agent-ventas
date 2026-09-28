@@ -122,9 +122,15 @@ def get_usage_stats(db: Session, business_id: int) -> dict:
         .scalar()
     )
     
+    # Presupuesto DIARIO del negocio (Business.daily_token_budget) con fallback
+    # al global: es el mismo valor que usa check_business_limits para cortar.
+    # (Antes devolvía el global siempre y el panel mostraba un % falso.)
+    business = db.query(Business).filter(Business.id == business_id).first()
+    budget = (business.daily_token_budget if business else None) or settings.daily_token_budget
+
     return {
         "tokens_today": tokens_today or 0,
-        "daily_token_budget": settings.daily_token_budget,
+        "daily_token_budget": budget,
         "active_conversations": active_conversations,
         "total_conversations": total_conversations,
         "total_messages": total_messages or 0,

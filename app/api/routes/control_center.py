@@ -27,6 +27,8 @@ from app.db.models import (
 )
 from app.device_auth import (
     authenticate_device,
+    consume_ws_ticket,
+    create_ws_ticket,
     get_device_from_request,
     get_heartbeat_interval_seconds,
     get_lease_duration_seconds,
@@ -34,6 +36,7 @@ from app.device_auth import (
     register_device,
     revoke_device,
     update_heartbeat,
+    WS_TICKET_TTL_SECONDS,
 )
 from app.realtime import broadcast_event, manager
 
@@ -362,6 +365,45 @@ async def get_full_state(
     }
 
 
+@router.get("/control-center/usage")
+async def get_usage(
+    db: Session = Depends(get_db),
+    current_device: Device = Depends(get_device_from_request),
+):
+    """Consumo IA del tenant hoy: tokens vs presupuesto + nivel de alerta.
+
+    Niveles: ok (<50%) · attention (≥50%) · warning (≥75%) ·
+    critical (≥90%) · blocked (≥100%, el presupuesto ya corta los mensajes).
+    Sirve tanto para proteger el margen como para avisar al cliente.
+    """
+    from app.limits import get_usage_stats  # import local: evita ciclo de imports
+
+    stats = get_usage_stats(db, current_device.business_id)
+    used = int(stats.get("tokens_today") or 0)
+    budget = int(stats.get("daily_token_budget") or settings.daily_token_budget or 1)
+    percent = round(min(100.0, 100.0 * used / budget), 1)
+
+    if percent >= 100:
+        level = "blocked"
+    elif percent >= 90:
+        level = "critical"
+    elif percent >= 75:
+        level = "warning"
+    elif percent >= 50:
+        level = "attention"
+    else:
+        level = "ok"
+
+    return {
+        **stats,
+        "tokens_today": used,
+        "daily_token_budget": budget,
+        "percent": percent,
+        "level": level,
+        "remaining_tokens": max(0, budget - used),
+    }
+
+
 # ============================================================================
 # Legacy endpoints (backward compatibility)
 # ============================================================================
@@ -482,6 +524,22 @@ async def control_center_stats(token: str = Query(...), db: Session = Depends(ge
     }
 
 
+@router.post("/control-center/ws-ticket")
+async def issue_ws_ticket(
+    db: Session = Depends(get_db),
+    current_device: Device = Depends(get_device_from_request),
+):
+    """Emite un ticket de WebSocket de un solo uso y corta vida.
+
+    El Bearer token es permanente y NO viaja por la URL del WebSocket.
+    Flujo del cliente:
+        Authorization: Bearer <device_token>  →  POST /ws-ticket
+        →  WS /control-center/ws?ticket=<one-time>
+    """
+    ticket = create_ws_ticket(current_device.id)
+    return {"ticket": ticket, "expires_in": WS_TICKET_TTL_SECONDS, "single_use": True}
+
+
 # ============================================================================
 # WebSocket
 # ============================================================================
@@ -490,18 +548,21 @@ async def control_center_stats(token: str = Query(...), db: Session = Depends(ge
 @router.websocket("/control-center/ws")
 async def websocket_endpoint(
     websocket: WebSocket,
-    token: str = Query(...),
+    ticket: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    """WebSocket para real-time sync.
+    """WebSocket para real-time sync — autenticado con ticket de un solo uso.
 
-    El cliente se conecta con ?token=<device_bearer_token>.
+    El cliente pide el ticket con POST /control-center/ws-ticket (Bearer) y se
+    conecta con ?ticket=<ticket>. El ticket se consume en el primer intento y
+    expira en WS_TICKET_TTL_SECONDS (60 s): un token permanente jamás aparece
+    en una URL ni en los logs de infraestructura.
+
     Recibe eventos: conversation_created, conversation_updated, conversation_claimed,
     conversation_released, conversation_closed, message_created.
     """
-    # Autenticar el dispositivo (usa get_db: misma fuente que el resto de la app)
     try:
-        device = authenticate_device(db, token)
+        device = consume_ws_ticket(ticket, db)
     except HTTPException:
         await websocket.close(code=4001, reason="unauthorized")
         return
