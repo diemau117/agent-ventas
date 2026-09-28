@@ -16,13 +16,12 @@ def get_engine():
     disponible. La conexión se establece solo cuando se necesita.
     """
     url = settings.database_url
-    # pg8000: driver puro Python que no depende de OpenSSL del sistema.
-    # Maneja SSL de forma diferente a psycopg2 y funciona con Render PostgreSQL.
+    # psycopg2: driver de PostgreSQL para Python.
     if url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+pg8000://", 1)
+        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
     connect_args = {}
     if "sslmode" not in url:
-        connect_args["ssl_context"] = True  # pg8000 usa ssl_context=True para SSL por defecto
+        connect_args["sslmode"] = "require"
     return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
 
