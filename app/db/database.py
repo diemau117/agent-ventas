@@ -22,7 +22,7 @@ def get_engine():
         url = url.replace("postgresql://", "postgresql+pg8000://", 1)
     connect_args = {}
     if "sslmode" not in url:
-        connect_args["ssl_context"] = None  # pg8000 usa ssl_context=None para SSL por defecto
+        connect_args["ssl_context"] = True  # pg8000 usa ssl_context=True para SSL por defecto
     return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
 
