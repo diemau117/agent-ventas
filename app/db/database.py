@@ -21,10 +21,9 @@ def get_engine():
         url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
     connect_args = {}
     if "sslmode" not in url:
-        # verify-full + sslrootcert=system es la única combinación válida
-        # para psycopg2 + Render PostgreSQL
-        connect_args["sslmode"] = "verify-full"
-        connect_args["sslrootcert"] = "system"
+        # require: cifra la conexión sin verificar el certificado.
+        # verify-full falla porque no hay certificados del sistema en el contenedor.
+        connect_args["sslmode"] = "require"
     return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
 
